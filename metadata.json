@@ -1,0 +1,5 @@
+{
+  "name": "Gestión de Conteos de Pañol",
+  "description": "Una aplicación web para la gestión de inventario y conteos de pañol, organizada por semanas. Permite roles de operario y administrador para el seguimiento y la finalización de tareas de conteo.",
+  "requestFramePermissions": []
+}
