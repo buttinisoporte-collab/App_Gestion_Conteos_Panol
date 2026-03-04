@@ -1,14 +1,27 @@
 import postgres from 'postgres';
 
 export async function createTables() {
-  const sqlUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  let sqlUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  
   if (!sqlUrl) {
     throw new Error('DATABASE_URL or POSTGRES_URL environment variable is required to create tables.');
   }
 
-  const sql = postgres(sqlUrl);
+  // Limpiar parámetros específicos de Supabase que pueden causar errores en el driver de postgres
+  // Algunos poolers de Supabase añaden ?supa=base-pooler.x que puede romper el parsing
+  if (sqlUrl.includes('supa=base-pooler')) {
+    sqlUrl = sqlUrl.split('?')[0] + '?sslmode=require';
+  }
+
+  const sql = postgres(sqlUrl, {
+    ssl: 'require',
+    connect_timeout: 10,
+    max: 1
+  });
 
   try {
+    console.log('Iniciando creación de tablas en Supabase...');
+
     // Users table
     await sql`
       CREATE TABLE IF NOT EXISTS users (

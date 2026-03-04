@@ -30,11 +30,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dataService.getCurrentCount(),
         dataService.getHistoricalCounts()
       ]);
-      setUsers(fetchedUsers);
-      setCountCycle(fetchedCurrentCount);
-      setHistoricalCounts(fetchedHistorical);
+      setUsers(fetchedUsers || []);
+      setCountCycle(fetchedCurrentCount || null);
+      setHistoricalCounts(fetchedHistorical || []);
     } catch (error) {
       console.error('Error refreshing data:', error);
+      // Ensure we don't get stuck in loading even on error
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
