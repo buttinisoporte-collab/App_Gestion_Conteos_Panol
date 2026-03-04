@@ -70,10 +70,11 @@ const renderError = (title: string, message: string, detail?: string, rawValue?:
       </div>
     </React.StrictMode>
   );
-  // 👇 ¡ESTAS SON LAS LÍNEAS QUE FALTAN Y DEBES AGREGAR AQUÍ AL FINAL! 👇
+};
+
 root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
-};
+
