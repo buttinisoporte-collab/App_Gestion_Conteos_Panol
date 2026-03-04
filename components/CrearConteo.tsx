@@ -88,7 +88,17 @@ const CrearConteo: React.FC<CrearConteoProps> = ({ onBack }) => {
             setError(`Error en Semana ${i + 1}, Línea ${j + 1}: Stock de sistema no válido.`);
             return;
           }
-          weekItems.push({ id, description, manufacturerCode, category, location, systemStock, quantity: null });
+          const weekId = `S${i + 1}`;
+          weekItems.push({ 
+            id: `${weekId}-${id}`, 
+            description, 
+            manufacturerCode, 
+            category, 
+            location, 
+            systemStock, 
+            quantity: null,
+            materialId: id
+          });
         }
       }
 

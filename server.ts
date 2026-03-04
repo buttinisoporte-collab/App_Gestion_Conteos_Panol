@@ -15,7 +15,7 @@ async function createServer() {
 
   app.get('/api/setup-database', async (req, res) => {
     try {
-      const { createTables } = await import('./lib/db-schema');
+      const { createTables } = await import('./lib/db-schema.js');
       await createTables();
       res.status(200).json({ message: 'Base de datos configurada exitosamente.' });
     } catch (error) {

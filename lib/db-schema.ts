@@ -1,91 +1,131 @@
-import { sql } from '@vercel/postgres';
+import postgres from 'postgres';
 
 export async function createTables() {
-  const client = await sql.connect();
+  const sqlUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  if (!sqlUrl) {
+    throw new Error('DATABASE_URL or POSTGRES_URL environment variable is required to create tables.');
+  }
+
+  const sql = postgres(sqlUrl);
+
   try {
-    await client.sql`
+    // Users table
+    await sql`
       CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        role VARCHAR(50) NOT NULL,
-        full_name VARCHAR(255),
-        dni VARCHAR(50),
-        employee_id VARCHAR(50),
-        status VARCHAR(50) DEFAULT 'active',
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL,
+        full_name TEXT,
+        dni TEXT,
+        employee_id TEXT,
+        status TEXT DEFAULT 'active',
         must_change_password BOOLEAN DEFAULT false
       );
     `;
 
-    await client.sql`
+    // Count Cycles table
+    await sql`
       CREATE TABLE IF NOT EXISTS count_cycles (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
         start_date DATE,
         end_date DATE,
-        creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        creation_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         archived BOOLEAN DEFAULT false
       );
     `;
 
-    await client.sql`
+    // Weeks table
+    await sql`
       CREATE TABLE IF NOT EXISTS weeks (
-        id SERIAL PRIMARY KEY,
-        cycle_id INTEGER REFERENCES count_cycles(id) ON DELETE CASCADE,
-        name VARCHAR(255) NOT NULL,
+        id TEXT PRIMARY KEY,
+        cycle_id TEXT REFERENCES count_cycles(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
         start_date DATE,
         end_date DATE,
-        status VARCHAR(50) NOT NULL,
+        status TEXT NOT NULL,
         finalization_observation TEXT,
-        last_modified_by VARCHAR(255),
-        last_modified_date TIMESTAMP
+        finalized_by TEXT,
+        finalization_date TIMESTAMP WITH TIME ZONE,
+        last_modified_by TEXT,
+        last_modified_date TIMESTAMP WITH TIME ZONE
       );
     `;
 
-    await client.sql`
+    // Items table
+    await sql`
       CREATE TABLE IF NOT EXISTS items (
-        id SERIAL PRIMARY KEY,
-        week_id INTEGER REFERENCES weeks(id) ON DELETE CASCADE,
-        material_id VARCHAR(255) NOT NULL,
+        id TEXT PRIMARY KEY,
+        week_id TEXT REFERENCES weeks(id) ON DELETE CASCADE,
+        material_id TEXT NOT NULL,
         description TEXT,
-        manufacturer_code VARCHAR(255),
-        category VARCHAR(255),
-        location VARCHAR(255),
+        manufacturer_code TEXT,
+        category TEXT,
+        location TEXT,
         system_stock INTEGER,
         quantity INTEGER,
-        counted_date TIMESTAMP,
-        counted_by VARCHAR(255)
+        counted_date DATE,
+        counted_by TEXT
       );
     `;
 
-    await client.sql`
-      CREATE TABLE IF NOT EXISTS audit_log (
+    // Audit Log for Items
+    await sql`
+      CREATE TABLE IF NOT EXISTS item_audit_log (
         id SERIAL PRIMARY KEY,
-        item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
-        user_id INTEGER REFERENCES users(id),
-        field_changed VARCHAR(255),
+        item_id TEXT REFERENCES items(id) ON DELETE CASCADE,
+        user_name TEXT,
+        field_changed TEXT,
         old_value TEXT,
         new_value TEXT,
-        change_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        change_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
 
-    await client.sql`
+    // Audit Log for Users
+    await sql`
       CREATE TABLE IF NOT EXISTS user_audit_log (
         id SERIAL PRIMARY KEY,
-        admin_user_id INTEGER REFERENCES users(id),
-        affected_user_id INTEGER REFERENCES users(id),
-        action VARCHAR(255),
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        action TEXT,
+        performed_by TEXT,
         details TEXT,
-        action_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
 
-    console.log('Tablas creadas o ya existentes.');
+    // App Settings table
+    await sql`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value JSONB
+      );
+    `;
+
+    // Seed initial admin user if no users exist
+    const users = await sql`SELECT id FROM users LIMIT 1`;
+    if (users.length === 0) {
+      console.log('Seeding initial admin user...');
+      await sql`
+        INSERT INTO users (id, username, password, role, full_name, status, must_change_password)
+        VALUES (
+          'admin-01', 
+          'Admin', 
+          'Admin', 
+          'admin', 
+          'Administrador del Sistema', 
+          'active', 
+          false
+        )
+      `;
+    }
+
+    console.log('Tablas creadas o ya existentes en Supabase/Postgres.');
   } catch (error) {
     console.error('Error al crear las tablas:', error);
     throw error;
   } finally {
-    client.release();
+    await sql.end();
   }
 }

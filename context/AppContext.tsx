@@ -1,13 +1,10 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User, Role, WeekData, Item, WeekStatus, AppState, CountCycle, AuditLogEntry, SettingsData } from '../types';
-import { loadDataFromLocalStorage, saveDataToLocalStorage } from '../services/dataService';
+import { dataService } from '../services/dataService';
 import { settingsService } from '../services/settingsService';
-
-
-
 import { AppContextType } from '../types';
-import { getInitialData } from '../services/dataService';
+import { RefreshCw } from '../components/ui/Icons';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -19,50 +16,57 @@ const defaultSettings: SettingsData = {
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [appState, setAppState] = useState<AppState>(() => loadDataFromLocalStorage());
+  const [users, setUsers] = useState<User[]>([]);
+  const [countCycle, setCountCycle] = useState<CountCycle | null>(null);
+  const [historicalCounts, setHistoricalCounts] = useState<CountCycle[]>([]);
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refreshData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical] = await Promise.all([
+        dataService.getUsers(),
+        dataService.getCurrentCount(),
+        dataService.getHistoricalCounts()
+      ]);
+      setUsers(fetchedUsers);
+      setCountCycle(fetchedCurrentCount);
+      setHistoricalCounts(fetchedHistorical);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchSettings = async () => {
+    const init = async () => {
       const remoteSettings = await settingsService.getSettings();
       if (remoteSettings) {
         setSettings(remoteSettings);
       } else {
-        // If no remote settings, try to migrate from local storage or use defaults
-        const savedSettings = localStorage.getItem('appSettings');
-        if (savedSettings) {
-          const parsed = JSON.parse(savedSettings);
-          setSettings(parsed);
-          // Sync to Supabase for the first time
-          await settingsService.updateAllSettings(parsed);
-        } else {
-          await settingsService.updateAllSettings(defaultSettings);
-        }
+        await settingsService.updateAllSettings(defaultSettings);
       }
+      await refreshData();
     };
-    fetchSettings();
-  }, []);
+    init();
+  }, [refreshData]);
 
-  const refreshData = () => {
-    setAppState(loadDataFromLocalStorage());
-  };
-
-  const resetApplicationData = () => {
+  const resetApplicationData = async () => {
     if (user?.username !== 'Admin') {
       alert('Acción no permitida.');
       return;
     }
     if (window.confirm('¿Está seguro? Esta acción borrará TODOS los datos y restaurará la aplicación a su estado inicial.')) {
-      const initialData = getInitialData();
-      saveDataToLocalStorage(initialData);
-      setAppState(initialData);
-      // Forzar un refresco de la página para asegurar que todo se reinicie
-      window.location.reload();
+      // In a real Supabase app, we'd have a reset function or just clear tables
+      // For now, we'll just alert that this needs backend implementation or manual reset
+      alert('Para reiniciar los datos en Supabase, use el endpoint /api/setup-database o limpie las tablas manualmente.');
     }
   };
 
-  const login = (username: string, password?: string): boolean => {
-    const foundUser = appState.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+  const login = async (username: string, password?: string): Promise<boolean> => {
+    const foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
 
     if (foundUser && foundUser.status === 'inactive') {
       alert('Su usuario está inactivo. Comuníquese con el sector de Soporte Técnico para resolver su situación.');
@@ -75,216 +79,127 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
-  const changePassword = (newPassword: string) => {
+  const changePassword = async (newPassword: string) => {
     if (!user) return;
 
-    setAppState(prevState => {
-      const updatedUsers = prevState.users.map(u => {
-        if (u.id === user.id) {
-          const newEntry = {
-            date: new Date().toISOString(),
-            action: 'Cambio de Contraseña',
-            performedBy: user.fullName, // Use fullName
-            details: 'El usuario cambió su propia contraseña'
-          };
-          const updated = { ...u, password: newPassword, mustChangePassword: false, auditLog: [...(u.auditLog || []), newEntry] };
-          setUser(updated);
-          return updated;
-        }
-        return u;
-      });
-      const newState = { ...prevState, users: updatedUsers };
-      saveDataToLocalStorage(newState);
-      return newState;
-    });
+    const updatedUser = { ...user, password: newPassword, mustChangePassword: false };
+    const success = await dataService.saveUser(updatedUser);
+    if (success) {
+      setUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
+    }
   };
 
-  const resetPassword = (userId: string) => {
+  const resetPassword = async (userId: string) => {
     if (!user || user.role !== 'admin') return;
 
-    setAppState(prevState => {
-      const updatedUsers = prevState.users.map(u => {
-        if (u.id === userId) {
-          const newEntry = {
-            date: new Date().toISOString(),
-            action: 'Reseteo de Contraseña',
-            performedBy: user.fullName, // Use fullName
-            details: `Administrador reseteó la clave al valor inicial (${u.username})`
-          };
-          return { ...u, password: u.username, mustChangePassword: true, auditLog: [...(u.auditLog || []), newEntry] };
-        }
-        return u;
-      });
-      const newState = { ...prevState, users: updatedUsers };
-      saveDataToLocalStorage(newState);
-      return newState;
-    });
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    const updatedUser = { ...targetUser, password: targetUser.username, mustChangePassword: true };
+    const success = await dataService.saveUser(updatedUser);
+    if (success) {
+      setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+    }
   };
 
   const logout = () => {
     setUser(null);
   };
-  
-  const updateCurrentCountWeeks = (newWeeks: WeekData[]) => {
-    setAppState(prevState => {
-      if (!prevState.currentCount) return prevState;
-      const newState = {
-        ...prevState,
-        currentCount: {
-          ...prevState.currentCount,
-          weeks: newWeeks,
-        },
-      };
-      saveDataToLocalStorage(newState);
-      return newState;
-    });
-  };
 
-  const updateItem = (weekId: string, itemId: string, field: keyof Item, value: any) => {
-    if (!user || !appState.currentCount) return;
+  const updateItem = async (weekId: string, itemId: string, field: keyof Item, value: any) => {
+    if (!user || !countCycle) return;
 
-    const newWeeks = appState.currentCount.weeks.map(w => {
-        if (w.id === weekId) {
-            const newItems = w.items.map(item => {
-                if (item.id === itemId) {
-                    const oldValue = item[field];
-                    if (oldValue === value) return item;
+    const week = countCycle.weeks.find(w => w.id === weekId);
+    if (!week) return;
 
-                    const newLogEntry: AuditLogEntry = {
-                        user: user.fullName, // Use fullName
-                        date: new Date().toISOString(),
-                        field: field,
-                        oldValue: oldValue,
-                        newValue: value
-                    };
+    const item = week.items.find(i => i.id === itemId);
+    if (!item) return;
 
-                    const updatedItem = { 
-                        ...item, 
-                        [field]: value,
-                        auditLog: [...(item.auditLog || []), newLogEntry]
-                    };
-
-                    if (field === 'quantity') {
-                        if (value !== null && value !== '') {
-                            updatedItem.countedDate = new Date().toISOString().split('T')[0];
-                        } else {
-                            updatedItem.countedDate = null;
-                        }
-                    }
-                    return updatedItem;
-                }
-                return item;
-            });
-            return { 
-                ...w, 
-                items: newItems,
-                status: WeekStatus.EnProgreso,
-                lastModifiedBy: user.fullName, // Use fullName
-                lastModifiedDate: new Date().toISOString()
-            };
-        }
-        return w;
-    });
-
-    updateCurrentCountWeeks(newWeeks);
-  };
-
-
-  const saveProgress = useCallback(() => {
-    saveDataToLocalStorage(appState);
-  }, [appState]);
-
-  const finalizeWeek = (weekId: string, observation?: string) => {
-    if (!user || !appState.currentCount) return;
-
-    saveProgress();
-
-    setAppState(prevState => {
-        if (!prevState.currentCount) return prevState;
-
-        let weekIndex = -1;
-        const finalWeeks = prevState.currentCount.weeks.map((week, index) => {
-            if (week.id === weekId) {
-                weekIndex = index;
-                return { 
-                    ...week, 
-                    status: WeekStatus.Finalizado,
-                    finalizationObservation: observation,
-                    finalizedBy: user.fullName,
-                    finalizationDate: new Date().toISOString(),
-                    lastModifiedBy: user.fullName, // Use fullName
-                    lastModifiedDate: new Date().toISOString()
-                };
-            }
-            return week;
-        });
-
-        if (weekIndex !== -1 && weekIndex + 1 < finalWeeks.length) {
-            if(finalWeeks[weekIndex + 1].status === WeekStatus.Bloqueado) {
-              finalWeeks[weekIndex + 1].status = WeekStatus.Pendiente;
-            }
-        }
-
-        const allWeeksFinalized = finalWeeks.every(w => w.status === WeekStatus.Finalizado);
-
-        if (allWeeksFinalized) {
-            const newState = {
-                ...prevState,
-                currentCount: null,
-                historicalCounts: [...prevState.historicalCounts, { ...prevState.currentCount, weeks: finalWeeks }],
-            };
-            saveDataToLocalStorage(newState);
-            return newState;
-        }
-        
-        const newState = {
-            ...prevState,
-            currentCount: {
-                ...prevState.currentCount,
-                weeks: finalWeeks,
-            }
-        };
-        saveDataToLocalStorage(newState);
-        return newState;
-    });
-  };
-  
-  const createNewCount = (name: string, startDate: string, endDate: string, newWeeks: WeekData[]) => {
-    setAppState(prevState => {
-      const newHistoricalCounts = [...prevState.historicalCounts];
-      // Archive the current count if it exists and has been started
-      if (prevState.currentCount && prevState.currentCount.weeks.some(w => w.status !== WeekStatus.Pendiente && w.status !== WeekStatus.Bloqueado)) {
-        newHistoricalCounts.push(prevState.currentCount);
-      }
-
-      const newCountCycle: CountCycle = {
-        id: `C-${Date.now()}`,
-        name: name,
-        startDate,
-        endDate,
-        creationDate: new Date().toISOString(),
-        weeks: newWeeks,
-      };
-
-      const newState: AppState = {
-        users: prevState.users,
-        currentCount: newCountCycle,
-        historicalCounts: newHistoricalCounts,
-      };
-      
-      saveDataToLocalStorage(newState);
-      return newState;
-    });
-  }
-
-  const addUser = (userData: Omit<User, 'id' | 'status'>) => {
-    if (!user) return false;
-
-    const existingUser = appState.users.find(u => u.username.toLowerCase() === userData.username.toLowerCase());
-    if (existingUser) {
-      alert('El nombre de usuario ya existe.');
-      return false;
+    const updatedItem = { ...item, [field]: value };
+    if (field === 'quantity') {
+      updatedItem.countedDate = value !== null && value !== '' ? new Date().toISOString().split('T')[0] : null;
+      updatedItem.countedBy = user.fullName;
     }
+
+    const success = await dataService.updateItem(weekId, updatedItem, user.fullName);
+    if (success) {
+      setCountCycle(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          weeks: prev.weeks.map(w => w.id === weekId ? {
+            ...w,
+            items: w.items.map(i => i.id === itemId ? updatedItem : i),
+            lastModifiedBy: user.fullName,
+            lastModifiedDate: new Date().toISOString(),
+            status: WeekStatus.EnProgreso
+          } : w)
+        };
+      });
+    }
+  };
+
+  const finalizeWeek = async (weekId: string, observation?: string) => {
+    if (!user || !countCycle) return;
+
+    const updatedWeeks = countCycle.weeks.map((w, index) => {
+      if (w.id === weekId) {
+        return {
+          ...w,
+          status: WeekStatus.Finalizado,
+          finalizationObservation: observation,
+          finalizedBy: user.fullName,
+          finalizationDate: new Date().toISOString(),
+          lastModifiedBy: user.fullName,
+          lastModifiedDate: new Date().toISOString()
+        };
+      }
+      // Unlock next week if applicable
+      const prevWeek = countCycle.weeks[index - 1];
+      if (prevWeek && prevWeek.id === weekId && w.status === WeekStatus.Bloqueado) {
+        return { ...w, status: WeekStatus.Pendiente };
+      }
+      return w;
+    });
+
+    const updatedCycle = { ...countCycle, weeks: updatedWeeks };
+    
+    // Check if all weeks are finalized
+    const allFinalized = updatedWeeks.every(w => w.status === WeekStatus.Finalizado);
+    if (allFinalized) {
+      await dataService.archiveCountCycle(countCycle.id);
+      setCountCycle(null);
+      setHistoricalCounts(prev => [updatedCycle, ...prev]);
+    } else {
+      await dataService.saveCountCycle(updatedCycle);
+      setCountCycle(updatedCycle);
+    }
+  };
+
+  const createNewCount = async (name: string, startDate: string, endDate: string, newWeeks: WeekData[]) => {
+    if (countCycle) {
+      await dataService.archiveCountCycle(countCycle.id);
+    }
+
+    const newCycle: CountCycle = {
+      id: `C-${Date.now()}`,
+      name,
+      startDate,
+      endDate,
+      creationDate: new Date().toISOString(),
+      weeks: newWeeks,
+    };
+
+    const success = await dataService.saveCountCycle(newCycle);
+    if (success) {
+      setCountCycle(newCycle);
+      await refreshData();
+    }
+  };
+
+  const addUser = async (userData: Omit<User, 'id' | 'status'>) => {
+    if (!user) return false;
 
     const newUser: User = {
       ...userData,
@@ -292,134 +207,98 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       password: userData.username,
       status: 'active',
       mustChangePassword: true,
-      auditLog: [{
-        date: new Date().toISOString(),
-        action: 'Creación de Usuario',
-        performedBy: user.fullName, // Use fullName
-        details: 'Usuario creado con contraseña inicial igual al username'
-      }]
     };
-    setAppState(prevState => {
-        const newState = { ...prevState, users: [...prevState.users, newUser] };
-        saveDataToLocalStorage(newState);
-        return newState;
-    });
-    return true;
+
+    const success = await dataService.saveUser(newUser);
+    if (success) {
+      setUsers(prev => [...prev, newUser]);
+      return true;
+    }
+    return false;
   };
 
   const updateSettings = async (newSettings: Partial<SettingsData>) => {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
-    localStorage.setItem('appSettings', JSON.stringify(updatedSettings));
     await settingsService.updateAllSettings(updatedSettings);
   };
 
-  const updateUser = (userId: string, updatedUser: Partial<User>) => {
-    setAppState(prevState => {
-        const newUsers = prevState.users.map(u => u.id === userId ? { ...u, ...updatedUser } : u);
-        const newState = { ...prevState, users: newUsers };
-        saveDataToLocalStorage(newState);
-        return newState;
-    });
+  const updateUser = async (userId: string, updatedUser: Partial<User>) => {
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    const fullUpdatedUser = { ...targetUser, ...updatedUser };
+    const success = await dataService.saveUser(fullUpdatedUser);
+    if (success) {
+      setUsers(prev => prev.map(u => u.id === userId ? fullUpdatedUser : u));
+    }
   };
 
-  const updateWeekItems = (weekId: string, newItems: Item[]) => {
-    if (!user || !appState.currentCount) return;
+  const updateWeekItems = async (weekId: string, newItems: Item[]) => {
+    if (!user || !countCycle) return;
 
-    const newWeeks = appState.currentCount.weeks.map(w => {
+    const updatedWeeks = countCycle.weeks.map(w => {
       if (w.id === weekId) {
         return {
           ...w,
           items: newItems,
           lastModifiedBy: user.fullName,
           lastModifiedDate: new Date().toISOString(),
-          status: WeekStatus.EnProgreso, // Mark as in progress again
+          status: WeekStatus.EnProgreso,
         };
       }
       return w;
     });
 
-    updateCurrentCountWeeks(newWeeks);
-  };
-
-  const deleteCurrentCount = (cycleId?: string) => {
-    if (!user || user.role !== 'admin') {
-      alert('Acción no permitida.');
-      return;
-    }
-
-    if (cycleId) {
-      // Delete a historical count
-      if (user.username !== 'Admin') {
-        alert('Solo el usuario \"Admin\" puede eliminar conteos del historial.');
-        return;
-      }
-      setAppState(prevState => {
-        const newHistoricalCounts = prevState.historicalCounts.filter(c => c.id !== cycleId);
-        const newState = { ...prevState, historicalCounts: newHistoricalCounts };
-        saveDataToLocalStorage(newState);
-        return newState;
-      });
-    } else {
-      // Delete the current count
-      if (user.username !== 'Admin') {
-        alert('Solo el usuario \"Admin\" puede eliminar el conteo actual.');
-        return;
-      }
-      setAppState(prevState => {
-        if (!prevState.currentCount) return prevState;
-        const deletedCount = { 
-          ...prevState.currentCount, 
-          name: `${prevState.currentCount.name} (ELIMINADO)`
-        };
-        const newState = {
-          ...prevState,
-          currentCount: null,
-          historicalCounts: [...prevState.historicalCounts, deletedCount],
-        };
-        saveDataToLocalStorage(newState);
-        return newState;
-      });
+    const updatedCycle = { ...countCycle, weeks: updatedWeeks };
+    const success = await dataService.saveCountCycle(updatedCycle);
+    if (success) {
+      setCountCycle(updatedCycle);
     }
   };
 
-  const deleteUser = (userId: string) => {
-    // This function is now used to toggle status
+  const deleteCurrentCount = async (cycleId?: string) => {
     if (!user || user.role !== 'admin') return;
 
-    setAppState(prevState => {
-      const updatedUsers = prevState.users.map(u => {
-        if (u.id === userId) {
-          const newStatus: 'active' | 'inactive' = u.status === 'active' ? 'inactive' : 'active';
-          const newEntry = {
-            date: new Date().toISOString(),
-            action: `Cambio de Estado a ${newStatus.toUpperCase()}`,
-            performedBy: user.fullName, // Use fullName
-            details: `El estado del usuario fue cambiado por un administrador.`
-          };
-          return { ...u, status: newStatus, auditLog: [...(u.auditLog || []), newEntry] };
-        }
-        return u;
-      });
-      const newState = { ...prevState, users: updatedUsers };
-      saveDataToLocalStorage(newState);
-      return newState;
-    });
+    if (cycleId) {
+      // In this simplified version, we just archive or mark as deleted
+      await dataService.archiveCountCycle(cycleId);
+      await refreshData();
+    } else if (countCycle) {
+      await dataService.archiveCountCycle(countCycle.id);
+      setCountCycle(null);
+      await refreshData();
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!user || user.role !== 'admin') return;
+
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    const newStatus: 'active' | 'inactive' = targetUser.status === 'active' ? 'inactive' : 'active';
+    const updatedUser = { ...targetUser, status: newStatus };
+    
+    const success = await dataService.saveUser(updatedUser);
+    if (success) {
+      setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+    }
   };
 
   return (
     <AppContext.Provider value={{ 
         user, 
-        users: appState.users,
-        weeksData: appState.currentCount?.weeks || [], 
-        historicalCounts: appState.historicalCounts,
+        users,
+        weeksData: countCycle?.weeks || [], 
+        historicalCounts,
         login, 
         logout, 
         changePassword,
         resetPassword,
         settings,
         updateSettings,
-        saveProgress, 
+        saveProgress: () => {}, // No-op for now as we save on change
         finalizeWeek, 
         createNewCount,
         updateItem,
@@ -430,11 +309,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deleteCurrentCount,
         refreshData,
         resetApplicationData,
-        countCycle: appState.currentCount
+        countCycle
     }}>
-
-
-      {children}
+      {!isLoading ? children : (
+        <div className="flex items-center justify-center min-h-screen bg-slate-50">
+          <div className="text-center">
+            <RefreshCw className="h-12 w-12 animate-spin text-corporate-blue mx-auto mb-4" />
+            <p className="text-slate-600 font-medium">Cargando datos del sistema...</p>
+          </div>
+        </div>
+      )}
     </AppContext.Provider>
   );
 };

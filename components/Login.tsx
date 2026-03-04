@@ -11,12 +11,11 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSeeding, setIsSeeding] = useState(false);
-  const { login, settings, users } = useAppContext();
-  const seedAdmin = useMutation(api.users.seedInitialAdmin);
+  const { login, settings, users, refreshData } = useAppContext();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(username, password);
+    const success = await login(username, password);
     if (!success) {
       setError('Credenciales incorrectas. Intente de nuevo.');
     } else {
@@ -27,11 +26,16 @@ const Login: React.FC = () => {
   const handleSeedAdmin = async () => {
     setIsSeeding(true);
     try {
-      await seedAdmin();
-      alert('Administrador inicial creado con éxito. Usuario: Admin, Contraseña: Admin');
+      const response = await fetch('/api/setup-database');
+      if (response.ok) {
+        alert('Base de datos configurada y administrador inicial creado con éxito. Usuario: Admin, Contraseña: Admin');
+        await refreshData();
+      } else {
+        alert('Error al configurar la base de datos.');
+      }
     } catch (err) {
       console.error('Error seeding admin:', err);
-      alert('Error al crear el administrador inicial.');
+      alert('Error al conectar con el servidor.');
     } finally {
       setIsSeeding(false);
     }
@@ -89,7 +93,7 @@ const Login: React.FC = () => {
                 variant="outline" 
                 className="w-full border-corporate-blue text-corporate-blue hover:bg-corporate-blue/10"
               >
-                {isSeeding ? 'Creando...' : 'Crear Administrador Inicial'}
+                {isSeeding ? 'Configurando...' : 'Configurar Base de Datos'}
               </Button>
             )}
           </CardFooter>

@@ -29,7 +29,9 @@ export interface Item {
   location: string;
   systemStock: number;
   quantity: number | null;
-  countedDate?: string;
+  countedDate?: string | null;
+  countedBy?: string | null;
+  materialId?: string;
   auditLog?: AuditLogEntry[];
 }
 
@@ -89,7 +91,7 @@ export interface AppContextType {
   historicalCounts: CountCycle[];
   users: User[];
   settings: SettingsData;
-  login: (username: string, password?: string) => boolean;
+  login: (username: string, password?: string) => Promise<boolean>;
   logout: () => void;
   changePassword: (newPassword: string) => Promise<void>;
   resetPassword: (userId: string) => Promise<void>;
@@ -97,14 +99,13 @@ export interface AppContextType {
   updateItem: (weekId: string, itemId: string, field: keyof Item, value: any) => Promise<void>;
   finalizeWeek: (weekId: string, observation?: string) => Promise<void>;
   createNewCount: (name: string, startDate: string, endDate: string, newWeeks: WeekData[]) => Promise<void>;
-  addUser: (userData: Omit<User, 'id' | 'status'>) => Promise<boolean>;
+  addUser: (userData: Omit<User, "id" | "status">) => Promise<boolean>;
   updateUser: (userId: string, updatedUser: Partial<User>) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   updateWeekItems: (weekId: string, newItems: Item[]) => Promise<void>;
-  bulkUpdateItems: (updates: { itemId: string, quantity: number }[]) => Promise<void>;
   deleteCurrentCount: (cycleId?: string) => Promise<void>;
-  refreshData: () => void;
+  refreshData: () => Promise<void>;
   resetApplicationData: () => Promise<void>;
   countCycle: CountCycle | null;
-  updateSettings: (newSettings: Partial<SettingsData>) => void;
+  updateSettings: (newSettings: Partial<SettingsData>) => Promise<void>;
 }
