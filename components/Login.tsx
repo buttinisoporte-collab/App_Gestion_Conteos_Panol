@@ -4,8 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { useMutation } from "convex/react";
-import { api } from "../convex/_generated/api";
+
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
