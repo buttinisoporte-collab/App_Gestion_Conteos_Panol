@@ -1,0 +1,23 @@
+# --- Seguridad (CRÍTICO) ---
+.env
+*.pem
+key.json
+secrets.py
+
+# --- Google AI Studio / Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# --- Configuración de Editores ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Logs y temporales ---
+*.log
+node_modules/
