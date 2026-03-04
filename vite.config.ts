@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
         tailwindcss(),
         VitePWA({
           registerType: 'autoUpdate',
+          useCredentials: true, // <--- AGREGA ESTA LÍNEA AQUÍ
           includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
           manifest: {
             name: 'Gestión de Conteos de Pañol',
