@@ -24,12 +24,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);
+    
+    // Timeout to prevent infinite loading if Supabase is unreachable
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout fetching data')), 8000)
+    );
+
     try {
-      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical] = await Promise.all([
+      const fetchPromise = Promise.all([
         dataService.getUsers(),
         dataService.getCurrentCount(),
         dataService.getHistoricalCounts()
       ]);
+
+      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical] = await (Promise.race([fetchPromise, timeoutPromise]) as Promise<any>);
+      
       setUsers(fetchedUsers || []);
       setCountCycle(fetchedCurrentCount || null);
       setHistoricalCounts(fetchedHistorical || []);

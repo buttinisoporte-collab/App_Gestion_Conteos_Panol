@@ -1,3 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-corporate-yellow: #FFDE00;
+  --color-corporate-blue: #00387B;
+}
