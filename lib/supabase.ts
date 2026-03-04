@@ -5,14 +5,11 @@ let supabaseInstance: SupabaseClient | null = null;
 export const getSupabase = (): SupabaseClient | null => {
   if (supabaseInstance) return supabaseInstance;
 
-  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 
-                      (typeof process !== 'undefined' ? process.env.SUPABASE_URL : '') || 
-                      '';
-  const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 
-                          (typeof process !== 'undefined' ? process.env.SUPABASE_ANON_KEY : '') || 
-                          '';
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase credentials not found in import.meta.env');
     return null;
   }
 
