@@ -71,7 +71,3 @@ const renderError = (title: string, message: string, detail?: string, rawValue?:
     </React.StrictMode>
   );
 };
-
-
-  }
-}
