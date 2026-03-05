@@ -69,48 +69,65 @@ export const dataService = {
 
     if (cycleError || !cycleData) return null;
 
-    // Fetch weeks for this cycle
+    // Fetch all weeks for this cycle in one query
     const { data: weeksData, error: weeksError } = await supabase
       .from('weeks')
       .select('*')
-      .eq('cycle_id', cycleData.id);
+      .eq('cycle_id', cycleData.id)
+      .order('start_date', { ascending: true });
 
-    if (weeksError) return null;
+    if (weeksError || !weeksData) return null;
 
-    const weeks: WeekData[] = [];
-
-    for (const w of weeksData) {
-      // Fetch items for each week
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('items')
-        .select('*')
-        .eq('week_id', w.id);
-
-      weeks.push({
-        id: w.id,
-        name: w.name,
-        startDate: w.start_date,
-        endDate: w.end_date,
-        status: w.status as WeekStatus,
-        finalizationObservation: w.finalization_observation,
-        finalizedBy: w.finalized_by,
-        finalizationDate: w.finalization_date,
-        lastModifiedBy: w.last_modified_by,
-        lastModifiedDate: w.last_modified_date,
-        items: (itemsData || []).map(i => ({
-          id: i.id,
-          description: i.description,
-          manufacturerCode: i.manufacturer_code,
-          category: i.category,
-          location: i.location,
-          systemStock: i.system_stock,
-          quantity: i.quantity,
-          countedDate: i.counted_date,
-          countedBy: i.counted_by,
-          materialId: i.material_id
-        }))
-      });
+    if (weeksData.length === 0) {
+      return {
+        id: cycleData.id,
+        name: cycleData.name,
+        startDate: cycleData.start_date,
+        endDate: cycleData.end_date,
+        creationDate: cycleData.creation_date,
+        weeks: []
+      };
     }
+
+    // Fetch all items for all weeks in this cycle in one query
+    const weekIds = weeksData.map(w => w.id);
+    const { data: allItemsData, error: itemsError } = await supabase
+      .from('items')
+      .select('*')
+      .in('week_id', weekIds);
+
+    if (itemsError) return null;
+
+    const itemsByWeek = (allItemsData || []).reduce((acc: any, item: any) => {
+      if (!acc[item.week_id]) acc[item.week_id] = [];
+      acc[item.week_id].push({
+        id: item.id,
+        description: item.description,
+        manufacturerCode: item.manufacturer_code,
+        category: item.category,
+        location: item.location,
+        systemStock: item.system_stock,
+        quantity: item.quantity,
+        countedDate: item.counted_date,
+        countedBy: item.counted_by,
+        materialId: item.material_id
+      });
+      return acc;
+    }, {});
+
+    const weeks: WeekData[] = weeksData.map(w => ({
+      id: w.id,
+      name: w.name,
+      startDate: w.start_date,
+      endDate: w.end_date,
+      status: w.status as WeekStatus,
+      finalizationObservation: w.finalization_observation,
+      finalizedBy: w.finalized_by,
+      finalizationDate: w.finalization_date,
+      lastModifiedBy: w.last_modified_by,
+      lastModifiedDate: w.last_modified_date,
+      items: itemsByWeek[w.id] || []
+    }));
 
     return {
       id: cycleData.id,

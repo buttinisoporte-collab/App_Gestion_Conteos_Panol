@@ -27,7 +27,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     // Timeout to prevent infinite loading if Supabase is unreachable
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout fetching data')), 8000)
+      setTimeout(() => reject(new Error('Timeout fetching data')), 15000)
     );
 
     try {
