@@ -65,7 +65,7 @@ export const dataService = {
       .from('count_cycles')
       .select('*')
       .eq('archived', false)
-      .single();
+      .maybeSingle();
 
     if (cycleError || !cycleData) return null;
 
