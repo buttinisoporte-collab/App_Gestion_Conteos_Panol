@@ -271,9 +271,9 @@ const DashboardView: React.FC<{
 const DashboardAdmin: React.FC = () => {
     const { finalizeWeek, deleteCurrentCount, user, weeksData, refreshData, resetApplicationData } = useAppContext();
 
-  useEffect(() => {
-    refreshData();
-  }, []);
+//  useEffect(() => {
+//    refreshData();
+//  }, []);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [showResetDataModal, setShowResetDataModal] = useState(false);
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');

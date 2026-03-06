@@ -51,15 +51,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     const init = async () => {
-      const remoteSettings = await settingsService.getSettings();
-      if (remoteSettings) {
-        setSettings(remoteSettings);
-      } else {
-        await settingsService.updateAllSettings(defaultSettings);
+      try {
+        const remoteSettings = await settingsService.getSettings();
+        if (remoteSettings) {
+          setSettings(remoteSettings);
+        } else {
+          await settingsService.updateAllSettings(defaultSettings);
+        }
+      } catch (error) {
+        console.warn('Ignorando error de settings para no trabar la app:', error);
+      } finally {
+        // Al estar en finally, garantizamos que SIEMPRE se quite el spinner de carga
+        await refreshData();
       }
-      await refreshData();
     };
     init();
   }, [refreshData]);
