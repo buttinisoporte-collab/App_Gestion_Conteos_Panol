@@ -1,70 +1,45 @@
-import { getSupabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { SettingsData } from '../types';
 
-const SETTINGS_TABLE = 'app_settings';
+// Usaremos un único documento llamado 'global' dentro de la colección 'settings'
+const SETTINGS_COLLECTION = 'settings';
+const SETTINGS_DOC_ID = 'global';
 
 export const settingsService = {
+  
+  // OBTENER LA CONFIGURACIÓN
   async getSettings(): Promise<SettingsData | null> {
     try {
-      const supabase = getSupabase();
-      if (!supabase) return null;
+      // Referencia exacta al documento 'global'
+      const docRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
+      const docSnap = await getDoc(docRef);
 
-      const { data, error } = await supabase
-        .from(SETTINGS_TABLE)
-        .select('*');
-
-      if (error) throw error;
-
-      if (!data || data.length === 0) return null;
-
-      // Convert array of {key, value} to SettingsData object
-      const settings: any = {};
-      data.forEach((item: { key: string; value: any }) => {
-        settings[item.key] = item.value;
-      });
-
-      return settings as SettingsData;
+      if (docSnap.exists()) {
+        return docSnap.data() as SettingsData;
+      }
+      
+      console.log('No se encontraron settings, se usarán los valores por defecto.');
+      return null;
     } catch (error) {
-      console.error('Error fetching settings from Supabase:', error);
+      console.error('Error al obtener los settings de Firebase:', error);
       return null;
     }
   },
 
-  async updateSetting(key: string, value: any): Promise<boolean> {
-    try {
-      const supabase = getSupabase();
-      if (!supabase) return false;
-
-      const { error } = await supabase
-        .from(SETTINGS_TABLE)
-        .upsert({ key, value }, { onConflict: 'key' });
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error(`Error updating setting ${key} in Supabase:`, error);
-      return false;
-    }
-  },
-
+  // ACTUALIZAR O CREAR LA CONFIGURACIÓN
   async updateAllSettings(settings: SettingsData): Promise<boolean> {
     try {
-      const supabase = getSupabase();
-      if (!supabase) return false;
-
-      const updates = Object.entries(settings).map(([key, value]) => ({
-        key,
-        value,
-      }));
-
-      const { error } = await supabase
-        .from(SETTINGS_TABLE)
-        .upsert(updates, { onConflict: 'key' });
-
-      if (error) throw error;
+      const docRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
+      
+      // setDoc con { merge: true } es clave: 
+      // Si el documento no existe, lo crea. Si existe, solo actualiza los campos que le pasamos
+      // sin borrar otros campos que pudieran existir.
+      await setDoc(docRef, settings, { merge: true });
+      
       return true;
     } catch (error) {
-      console.error('Error updating all settings in Supabase:', error);
+      console.error('Error al actualizar los settings en Firebase:', error);
       return false;
     }
   }

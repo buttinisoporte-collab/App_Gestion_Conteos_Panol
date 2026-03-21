@@ -1,264 +1,72 @@
-
-import { getSupabase } from '../lib/supabase';
-import { WeekData, Item, WeekStatus, AppState, CountCycle, User, AuditLogEntry } from '../types';
+import { db } from '../lib/firebase';
+import { collection, getDocs, doc, setDoc, getDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { User, CountCycle, WeekStatus, Item } from '../types';
 
 export const dataService = {
+  // OBTENER USUARIOS
   async getUsers(): Promise<User[]> {
-    const supabase = getSupabase();
-    if (!supabase) return [];
-
-    const { data, error } = await supabase
-      .from('users')
-      .select('*');
-
-    if (error) {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      return querySnapshot.docs.map(doc => doc.data() as User);
+    } catch (error) {
       console.error('Error fetching users:', error);
-      return [];
+      return[];
     }
-
-    // Map DB fields to User type
-    return data.map(u => ({
-      id: u.id,
-      username: u.username,
-      password: u.password,
-      role: u.role,
-      fullName: u.full_name,
-      dni: u.dni,
-      employeeId: u.employee_id,
-      status: u.status,
-      mustChangePassword: u.must_change_password,
-      auditLog: [] // We'll fetch this separately if needed or just leave empty for list
-    }));
   },
 
+  // GUARDAR USUARIO
   async saveUser(user: User): Promise<boolean> {
-    const supabase = getSupabase();
-    if (!supabase) return false;
-
-    const { error } = await supabase
-      .from('users')
-      .upsert({
-        id: user.id,
-        username: user.username,
-        password: user.password,
-        role: user.role,
-        full_name: user.fullName,
-        dni: user.dni,
-        employee_id: user.employeeId,
-        status: user.status,
-        must_change_password: user.mustChangePassword
-      });
-
-    if (error) {
+    try {
+      // Usamos setDoc para crear o sobrescribir el documento con el ID del usuario
+      await setDoc(doc(db, 'users', user.id), user);
+      return true;
+    } catch (error) {
       console.error('Error saving user:', error);
       return false;
     }
-    return true;
   },
 
+  // OBTENER EL CONTEO ACTUAL
   async getCurrentCount(): Promise<CountCycle | null> {
-    const supabase = getSupabase();
-    if (!supabase) return null;
-
-    // Fetch the non-archived count cycle
-    const { data: cycleData, error: cycleError } = await supabase
-      .from('count_cycles')
-      .select('*')
-      .eq('archived', false)
-      .maybeSingle();
-
-    if (cycleError || !cycleData) return null;
-
-    // Fetch all weeks for this cycle in one query
-    const { data: weeksData, error: weeksError } = await supabase
-      .from('weeks')
-      .select('*')
-      .eq('cycle_id', cycleData.id)
-      .order('start_date', { ascending: true });
-
-    if (weeksError || !weeksData) return null;
-
-    if (weeksData.length === 0) {
-      return {
-        id: cycleData.id,
-        name: cycleData.name,
-        startDate: cycleData.start_date,
-        endDate: cycleData.end_date,
-        creationDate: cycleData.creation_date,
-        weeks: []
-      };
+    try {
+      // Buscamos ciclos donde archived sea false
+      const q = query(collection(db, 'count_cycles'), where('archived', '==', false));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) return null;
+      
+      // En NoSQL, el ciclo ya viene con las 'weeks' e 'items' anidados adentro!
+      return querySnapshot.docs[0].data() as CountCycle;
+    } catch (error) {
+      console.error('Error fetching current count:', error);
+      return null;
     }
-
-    // Fetch all items for all weeks in this cycle in one query
-    const weekIds = weeksData.map(w => w.id);
-    const { data: allItemsData, error: itemsError } = await supabase
-      .from('items')
-      .select('*')
-      .in('week_id', weekIds);
-
-    if (itemsError) return null;
-
-    const itemsByWeek = (allItemsData || []).reduce((acc: any, item: any) => {
-      if (!acc[item.week_id]) acc[item.week_id] = [];
-      acc[item.week_id].push({
-        id: item.id,
-        description: item.description,
-        manufacturerCode: item.manufacturer_code,
-        category: item.category,
-        location: item.location,
-        systemStock: item.system_stock,
-        quantity: item.quantity,
-        countedDate: item.counted_date,
-        countedBy: item.counted_by,
-        materialId: item.material_id
-      });
-      return acc;
-    }, {});
-
-    const weeks: WeekData[] = weeksData.map(w => ({
-      id: w.id,
-      name: w.name,
-      startDate: w.start_date,
-      endDate: w.end_date,
-      status: w.status as WeekStatus,
-      finalizationObservation: w.finalization_observation,
-      finalizedBy: w.finalized_by,
-      finalizationDate: w.finalization_date,
-      lastModifiedBy: w.last_modified_by,
-      lastModifiedDate: w.last_modified_date,
-      items: itemsByWeek[w.id] || []
-    }));
-
-    return {
-      id: cycleData.id,
-      name: cycleData.name,
-      startDate: cycleData.start_date,
-      endDate: cycleData.end_date,
-      creationDate: cycleData.creation_date,
-      weeks: weeks
-    };
   },
 
+  // GUARDAR UN CICLO COMPLETO (¡Mira qué fácil es en NoSQL!)
   async saveCountCycle(cycle: CountCycle): Promise<boolean> {
-    const supabase = getSupabase();
-    if (!supabase) return false;
-
-    // 1. Save Cycle
-    const { error: cycleError } = await supabase
-      .from('count_cycles')
-      .upsert({
-        id: cycle.id,
-        name: cycle.name,
-        start_date: cycle.startDate,
-        end_date: cycle.endDate,
-        creation_date: cycle.creationDate,
+    try {
+      // Guarda todo el objeto de golpe (Ciclo > Semanas > Ítems) en un solo documento
+      await setDoc(doc(db, 'count_cycles', cycle.id), {
+        ...cycle,
         archived: false
       });
-
-    if (cycleError) return false;
-
-    // 2. Save Weeks
-    for (const week of cycle.weeks) {
-      const { error: weekError } = await supabase
-        .from('weeks')
-        .upsert({
-          id: week.id,
-          cycle_id: cycle.id,
-          name: week.name,
-          start_date: week.startDate,
-          end_date: week.endDate,
-          status: week.status,
-          finalization_observation: week.finalizationObservation,
-          finalized_by: week.finalizedBy,
-          finalization_date: week.finalizationDate,
-          last_modified_by: week.lastModifiedBy,
-          last_modified_date: week.lastModifiedDate
-        });
-
-      if (weekError) continue;
-
-      // 3. Save Items
-      const itemsToUpsert = week.items.map(item => ({
-        id: item.id,
-        week_id: week.id,
-        material_id: item.materialId || item.id,
-        description: item.description,
-        manufacturer_code: item.manufacturerCode,
-        category: item.category,
-        location: item.location,
-        system_stock: item.systemStock,
-        quantity: item.quantity,
-        counted_date: item.countedDate,
-        counted_by: item.countedBy
-      }));
-
-      await supabase.from('items').upsert(itemsToUpsert);
+      return true;
+    } catch (error) {
+      console.error('Error saving count cycle:', error);
+      return false;
     }
-
-    return true;
   },
 
-  async updateItem(weekId: string, item: Item, userFullName: string): Promise<boolean> {
-    const supabase = getSupabase();
-    if (!supabase) return false;
-
-    const { error } = await supabase
-      .from('items')
-      .update({
-        quantity: item.quantity,
-        counted_date: item.countedDate,
-        counted_by: userFullName
-      })
-      .eq('id', item.id);
-
-    if (error) return false;
-
-    // Update week last modified
-    await supabase
-      .from('weeks')
-      .update({
-        last_modified_by: userFullName,
-        last_modified_date: new Date().toISOString(),
-        status: WeekStatus.EnProgreso
-      })
-      .eq('id', weekId);
-
-    return true;
-  },
-
-  async getHistoricalCounts(): Promise<CountCycle[]> {
-    const supabase = getSupabase();
-    if (!supabase) return [];
-
-    const { data: cycles, error } = await supabase
-      .from('count_cycles')
-      .select('*')
-      .eq('archived', true)
-      .order('creation_date', { ascending: false });
-
-    if (error) return [];
-
-    // For brevity, we might not fetch all weeks/items for the list view
-    // but the type requires them. In a real app, we'd fetch on demand.
-    return cycles.map(c => ({
-      id: c.id,
-      name: c.name,
-      startDate: c.start_date,
-      endDate: c.end_date,
-      creationDate: c.creation_date,
-      weeks: [] // Placeholder
-    }));
-  },
-
+  // ARCHIVAR CICLO
   async archiveCountCycle(cycleId: string): Promise<boolean> {
-    const supabase = getSupabase();
-    if (!supabase) return false;
-
-    const { error } = await supabase
-      .from('count_cycles')
-      .update({ archived: true })
-      .eq('id', cycleId);
-
-    return !error;
+    try {
+      const cycleRef = doc(db, 'count_cycles', cycleId);
+      await updateDoc(cycleRef, { archived: true });
+      return true;
+    } catch (error) {
+      console.error('Error archiving cycle:', error);
+      return false;
+    }
   }
 };
