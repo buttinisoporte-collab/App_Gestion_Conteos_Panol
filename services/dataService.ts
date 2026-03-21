@@ -81,4 +81,5 @@ export const dataService = {
     } catch (error) {
       console.error('Error fetching historical counts:', error);
       return
+    }  
 };
