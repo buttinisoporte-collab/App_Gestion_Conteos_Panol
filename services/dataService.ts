@@ -10,14 +10,13 @@ export const dataService = {
       return querySnapshot.docs.map(doc => doc.data() as User);
     } catch (error) {
       console.error('Error fetching users:', error);
-      return[];
+      return [];
     }
   },
 
   // GUARDAR USUARIO
   async saveUser(user: User): Promise<boolean> {
     try {
-      // Usamos setDoc para crear o sobrescribir el documento con el ID del usuario
       await setDoc(doc(db, 'users', user.id), user);
       return true;
     } catch (error) {
@@ -29,13 +28,11 @@ export const dataService = {
   // OBTENER EL CONTEO ACTUAL
   async getCurrentCount(): Promise<CountCycle | null> {
     try {
-      // Buscamos ciclos donde archived sea false
       const q = query(collection(db, 'count_cycles'), where('archived', '==', false));
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) return null;
       
-      // En NoSQL, el ciclo ya viene con las 'weeks' e 'items' anidados adentro!
       return querySnapshot.docs[0].data() as CountCycle;
     } catch (error) {
       console.error('Error fetching current count:', error);
@@ -43,10 +40,9 @@ export const dataService = {
     }
   },
 
-  // GUARDAR UN CICLO COMPLETO (¡Mira qué fácil es en NoSQL!)
+  // GUARDAR UN CICLO COMPLETO
   async saveCountCycle(cycle: CountCycle): Promise<boolean> {
     try {
-      // Guarda todo el objeto de golpe (Ciclo > Semanas > Ítems) en un solo documento
       await setDoc(doc(db, 'count_cycles', cycle.id), {
         ...cycle,
         archived: false
@@ -58,7 +54,7 @@ export const dataService = {
     }
   },
 
-// ARCHIVAR CICLO
+  // ARCHIVAR CICLO
   async archiveCountCycle(cycleId: string): Promise<boolean> {
     try {
       const cycleRef = doc(db, 'count_cycles', cycleId);
@@ -79,4 +75,7 @@ export const dataService = {
       return querySnapshot.docs.map(doc => doc.data() as CountCycle);
     } catch (error) {
       console.error('Error fetching historical counts:', error);
-      return
+      return []; // Corregido: retorna un array vacío en caso de error
+    }
+  }, // Cierre de la función
+}; // Cierre del objeto dataService
