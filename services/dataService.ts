@@ -80,6 +80,5 @@ export const dataService = {
       return querySnapshot.docs.map(doc => doc.data() as CountCycle);
     } catch (error) {
       console.error('Error fetching historical counts:', error);
-      return
-    }  
+      return  
 }
