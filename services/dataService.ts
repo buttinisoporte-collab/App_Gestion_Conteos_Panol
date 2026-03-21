@@ -68,7 +68,7 @@ export const dataService = {
       console.error('Error archiving cycle:', error);
       return false;
     }
-  }
+  },
 
   // OBTENER CONTEOS HISTÓRICOS (ARCHIVADOS)
   async getHistoricalCounts(): Promise<CountCycle[]> {
