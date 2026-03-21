@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User, Role, WeekData, Item, WeekStatus, AppState, CountCycle, AuditLogEntry, SettingsData } from '../types';
 import { dataService } from '../services/dataService';
@@ -17,15 +16,15 @@ const defaultSettings: SettingsData = {
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [countCycle, setCountCycle] = useState<CountCycle | null>(null);
-  const [historicalCounts, setHistoricalCounts] = useState<CountCycle[]>([]);
+  const[countCycle, setCountCycle] = useState<CountCycle | null>(null);
+  const[historicalCounts, setHistoricalCounts] = useState<CountCycle[]>([]);
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     
-    // Timeout to prevent infinite loading if Supabase is unreachable
+    // Timeout para prevenir carga infinita si Firebase no responde
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Timeout fetching data')), 15000)
     );
@@ -34,24 +33,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const fetchPromise = Promise.all([
         dataService.getUsers(),
         dataService.getCurrentCount(),
-        dataService.getHistoricalCounts()
+        dataService.getHistoricalCounts() // <-- OJO: Asegúrate de tener esta función en tu dataService.ts
       ]);
 
       const [fetchedUsers, fetchedCurrentCount, fetchedHistorical] = await (Promise.race([fetchPromise, timeoutPromise]) as Promise<any>);
       
-      setUsers(fetchedUsers || []);
+      setUsers(fetchedUsers ||[]);
       setCountCycle(fetchedCurrentCount || null);
-      setHistoricalCounts(fetchedHistorical || []);
+      setHistoricalCounts(fetchedHistorical ||[]);
     } catch (error) {
       console.error('Error refreshing data:', error);
-      // Ensure we don't get stuck in loading even on error
       setUsers([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  },[]);
 
-useEffect(() => {
+  useEffect(() => {
     const init = async () => {
       try {
         const remoteSettings = await settingsService.getSettings();
@@ -63,7 +61,6 @@ useEffect(() => {
       } catch (error) {
         console.warn('Ignorando error de settings para no trabar la app:', error);
       } finally {
-        // Al estar en finally, garantizamos que SIEMPRE se quite el spinner de carga
         await refreshData();
       }
     };
@@ -76,9 +73,7 @@ useEffect(() => {
       return;
     }
     if (window.confirm('¿Está seguro? Esta acción borrará TODOS los datos y restaurará la aplicación a su estado inicial.')) {
-      // In a real Supabase app, we'd have a reset function or just clear tables
-      // For now, we'll just alert that this needs backend implementation or manual reset
-      alert('Para reiniciar los datos en Supabase, use el endpoint /api/setup-database o limpie las tablas manualmente.');
+      alert('Para reiniciar los datos en Firebase, elimine las colecciones directamente desde la consola de Firestore.');
     }
   };
 
@@ -124,36 +119,39 @@ useEffect(() => {
     setUser(null);
   };
 
+  // ADAPTACIÓN PARA FIREBASE (NoSQL): Actualizamos el ciclo entero
   const updateItem = async (weekId: string, itemId: string, field: keyof Item, value: any) => {
     if (!user || !countCycle) return;
 
-    const week = countCycle.weeks.find(w => w.id === weekId);
-    if (!week) return;
-
-    const item = week.items.find(i => i.id === itemId);
-    if (!item) return;
-
-    const updatedItem = { ...item, [field]: value };
-    if (field === 'quantity') {
-      updatedItem.countedDate = value !== null && value !== '' ? new Date().toISOString().split('T')[0] : null;
-      updatedItem.countedBy = user.fullName;
-    }
-
-    const success = await dataService.updateItem(weekId, updatedItem, user.fullName);
-    if (success) {
-      setCountCycle(prev => {
-        if (!prev) return null;
+    const updatedWeeks = countCycle.weeks.map(w => {
+      if (w.id === weekId) {
         return {
-          ...prev,
-          weeks: prev.weeks.map(w => w.id === weekId ? {
-            ...w,
-            items: w.items.map(i => i.id === itemId ? updatedItem : i),
-            lastModifiedBy: user.fullName,
-            lastModifiedDate: new Date().toISOString(),
-            status: WeekStatus.EnProgreso
-          } : w)
+          ...w,
+          status: WeekStatus.EnProgreso,
+          lastModifiedBy: user.fullName,
+          lastModifiedDate: new Date().toISOString(),
+          items: w.items.map(i => {
+            if (i.id === itemId) {
+              const updated = { ...i, [field]: value };
+              if (field === 'quantity') {
+                updated.countedDate = value !== null && value !== '' ? new Date().toISOString().split('T')[0] : null;
+                updated.countedBy = user.fullName;
+              }
+              return updated;
+            }
+            return i;
+          })
         };
-      });
+      }
+      return w;
+    });
+
+    const updatedCycle = { ...countCycle, weeks: updatedWeeks };
+    
+    // En Firebase simplemente guardamos el documento completo del ciclo
+    const success = await dataService.saveCountCycle(updatedCycle);
+    if (success) {
+      setCountCycle(updatedCycle);
     }
   };
 
@@ -172,7 +170,6 @@ useEffect(() => {
           lastModifiedDate: new Date().toISOString()
         };
       }
-      // Unlock next week if applicable
       const prevWeek = countCycle.weeks[index - 1];
       if (prevWeek && prevWeek.id === weekId && w.status === WeekStatus.Bloqueado) {
         return { ...w, status: WeekStatus.Pendiente };
@@ -182,7 +179,6 @@ useEffect(() => {
 
     const updatedCycle = { ...countCycle, weeks: updatedWeeks };
     
-    // Check if all weeks are finalized
     const allFinalized = updatedWeeks.every(w => w.status === WeekStatus.Finalizado);
     if (allFinalized) {
       await dataService.archiveCountCycle(countCycle.id);
@@ -278,7 +274,6 @@ useEffect(() => {
     if (!user || user.role !== 'admin') return;
 
     if (cycleId) {
-      // In this simplified version, we just archive or mark as deleted
       await dataService.archiveCountCycle(cycleId);
       await refreshData();
     } else if (countCycle) {
@@ -307,7 +302,7 @@ useEffect(() => {
     <AppContext.Provider value={{ 
         user, 
         users,
-        weeksData: countCycle?.weeks || [], 
+        weeksData: countCycle?.weeks ||[], 
         historicalCounts,
         login, 
         logout, 
@@ -315,7 +310,7 @@ useEffect(() => {
         resetPassword,
         settings,
         updateSettings,
-        saveProgress: () => {}, // No-op for now as we save on change
+        saveProgress: () => {}, 
         finalizeWeek, 
         createNewCount,
         updateItem,

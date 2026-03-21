@@ -69,4 +69,17 @@ export const dataService = {
       return false;
     }
   }
+
+  // OBTENER CONTEOS HISTÓRICOS (ARCHIVADOS)
+  async getHistoricalCounts(): Promise<CountCycle[]> {
+    try {
+      // Buscamos los ciclos donde archived sea true
+      const q = query(collection(db, 'count_cycles'), where('archived', '==', true));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => doc.data() as CountCycle);
+    } catch (error) {
+      console.error('Error fetching historical counts:', error);
+      return
+    }
 };
