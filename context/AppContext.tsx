@@ -270,6 +270,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+const updateWeekComment = async (weekId: string, comment: string) => {
+    if (!user || !countCycle) return;
+    const updatedWeeks = countCycle.weeks.map(w => 
+      w.id === weekId ? { ...w, adminComment: comment } : w
+    );
+    const updatedCycle = { ...countCycle, weeks: updatedWeeks };
+    const success = await dataService.saveCountCycle(updatedCycle);
+    if (success) setCountCycle(updatedCycle);
+  };
+
   const deleteCurrentCount = async (cycleId?: string) => {
     if (!user || user.role !== 'admin') return;
 
@@ -318,6 +328,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateUser,
         deleteUser,
         updateWeekItems,
+        updateWeekComment,
         deleteCurrentCount,
         refreshData,
         resetApplicationData,

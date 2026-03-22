@@ -1,4 +1,3 @@
-
 export type Role = 'admin' | 'operario';
 
 export interface User {
@@ -33,6 +32,8 @@ export interface Item {
   countedBy?: string | null;
   materialId?: string;
   auditLog?: AuditLogEntry[];
+  operatorObservation?: string; // NUEVO: Observación del operario
+  adminComment?: string;        // NUEVO: Comentario del administrador
 }
 
 export interface AuditLogEntry {
@@ -62,6 +63,7 @@ export interface WeekData {
   finalizedBy?: string;
   finalizationDate?: string;
   finalizationObservation?: string;
+  adminComment?: string; // NUEVO: Comentario general de la semana
 }
 
 export interface CountCycle {
@@ -103,6 +105,7 @@ export interface AppContextType {
   updateUser: (userId: string, updatedUser: Partial<User>) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   updateWeekItems: (weekId: string, newItems: Item[]) => Promise<void>;
+  updateWeekComment: (weekId: string, comment: string) => Promise<void>; // NUEVO
   deleteCurrentCount: (cycleId?: string) => Promise<void>;
   refreshData: () => Promise<void>;
   resetApplicationData: () => Promise<void>;
