@@ -17,27 +17,34 @@ interface ConteoTableProps {
 }
 
 const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
-  const { user, updateItem, weeksData, finalizeWeek, saveProgress } = useAppContext();
+  // Usamos updateWeekItems para guardar todo en bloque en vez de uno por uno
+  const { user, updateWeekItems, weeksData, finalizeWeek } = useAppContext();
+  
   const currentWeekData = weeksData.find(w => w.id === week.id) || week;
-  const [editedItems, setEditedItems] = useState<Item[]>(() => JSON.parse(JSON.stringify(currentWeekData.items)));
+  
+  // 1. Inicializamos el estado local UNA SOLA VEZ para evitar que el cursor salte
+  const[editedItems, setEditedItems] = useState<Item[]>(() => JSON.parse(JSON.stringify(currentWeekData.items)));
+  
+  const [isFinalized, setIsFinalized] = useState(currentWeekData.status === 'Finalizado');
+  const [view, setView] = useState<'table' | 'report' | 'modify'>('table');
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showFinalizeModal, setShowFinalizeModal] = useState(false);
+  const[searchTerm, setSearchTerm] = useState('');
+  const [itemOrder, setItemOrder] = useState<string[]>([]);
+  
+  // 2. Estado para saber si hay cambios pendientes de guardar a Firebase
+  const[hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // 3. Ya NO sobrescribimos editedItems cuando cambia el contexto global para no interrumpir el tecleo
   useEffect(() => {
     const updatedWeek = weeksData.find(w => w.id === week.id);
     if (updatedWeek) {
-      setEditedItems(JSON.parse(JSON.stringify(updatedWeek.items)));
       setIsFinalized(updatedWeek.status === 'Finalizado');
     }
-  }, [weeksData, week.id]);
-  
-  const[isFinalized, setIsFinalized] = useState(week.status === 'Finalizado');
-  const[view, setView] = useState<'table' | 'report' | 'modify'>('table');
-  const[showSaveModal, setShowSaveModal] = useState(false);
-  const[showFinalizeModal, setShowFinalizeModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const[itemOrder, setItemOrder] = useState<string[]>([]);
+  },[weeksData, week.id]);
 
   useEffect(() => {
-    const initialSortedIds = [...currentWeekData.items]
+    const initialSortedIds =[...currentWeekData.items]
         .sort((a, b) => {
             const aCounted = a.quantity !== null;
             const bCounted = b.quantity !== null;
@@ -46,14 +53,39 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
         })
         .map(item => item.id);
     setItemOrder(initialSortedIds);
-  }, [week.id]);
+  },[week.id]);
 
+  // 4. AUTOGUARDADO EN SEGUNDO PLANO (Espera 1.5 segundos sin teclear para guardar)
+  useEffect(() => {
+    if (!hasUnsavedChanges || isFinalized) return;
+    
+    const timeoutId = setTimeout(() => {
+      updateWeekItems(week.id, editedItems);
+      setHasUnsavedChanges(false);
+    }, 1500);
+    
+    return () => clearTimeout(timeoutId);
+  },[editedItems, hasUnsavedChanges, isFinalized, week.id, updateWeekItems]);
+
+  // 5. Cambio INSTANTÁNEO en la interfaz local (sin lag ni saltos de cursor)
   const handleItemChange = (itemId: string, field: keyof Item, value: string | number | null) => {
-    updateItem(week.id, itemId, field, value);
+    setEditedItems(prevItems => prevItems.map(item => {
+      if (item.id === itemId) {
+        const updated = { ...item, [field]: value };
+        if (field === 'quantity') {
+          updated.countedDate = value !== null && value !== '' ? new Date().toISOString().split('T')[0] : null;
+          updated.countedBy = user?.fullName || null;
+        }
+        return updated;
+      }
+      return item;
+    }));
+    setHasUnsavedChanges(true);
   };
 
   const handleSave = () => {
-    saveProgress();
+    updateWeekItems(week.id, editedItems); // Forzamos el guardado
+    setHasUnsavedChanges(false);
     setShowSaveModal(true);
     setTimeout(() => {
       setShowSaveModal(false);
@@ -65,7 +97,12 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
     setShowFinalizeModal(true);
   };
 
-  const confirmFinalize = () => {
+  const confirmFinalize = async () => {
+    // Asegurarse de guardar antes de finalizar
+    if (hasUnsavedChanges) {
+      await updateWeekItems(week.id, editedItems);
+      setHasUnsavedChanges(false);
+    }
     finalizeWeek(week.id);
     setIsFinalized(true);
     setShowFinalizeModal(false);
@@ -74,7 +111,7 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
   const canEdit = user?.role === 'admin' || !isFinalized;
 
   const sortedAndFilteredItems = useMemo(() => {
-    const itemsById = new Map(editedItems.map(item => [item.id, item]));
+    const itemsById = new Map(editedItems.map(item =>[item.id, item]));
     const orderedItems = itemOrder.map(id => itemsById.get(id)).filter(Boolean) as Item[];
 
     if (!searchTerm) {
@@ -82,9 +119,10 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
     }
 
     return orderedItems.filter(item => 
-      item.id.toLowerCase().includes(searchTerm.toLowerCase())
+      item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [editedItems, searchTerm, itemOrder]);
+  },[editedItems, searchTerm, itemOrder]);
 
   return (
     <>
@@ -111,7 +149,9 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
               )}
               {!isFinalized && (
                 <>
-                  <Button onClick={handleSave} className="w-full sm:w-auto bg-corporate-blue text-white hover:bg-corporate-blue/90">Guardar Avance</Button>
+                  <Button onClick={handleSave} className="w-full sm:w-auto bg-corporate-blue text-white hover:bg-corporate-blue/90">
+                    Guardar Avance {hasUnsavedChanges && "*"}
+                  </Button>
                   {user?.role === 'admin' && (
                     <Button onClick={() => setShowFinalizeModal(true)} variant="destructive" className="w-full sm:w-auto">Finalizar Semana</Button>
                   )}
@@ -131,7 +171,7 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
           )}
 
           <div className="flex items-center mb-4">
-            <Input placeholder="Buscar por ID Material..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-xs" />
+            <Input placeholder="Buscar por ID Material o Descripción..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-xs" />
             <span className="text-sm text-slate-500 ml-4">Los ítems ya contados aparecen al final de la lista.</span>
           </div>
           
@@ -165,14 +205,20 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
                        <Input type="number" value={item.systemStock} onChange={(e) => handleItemChange(item.id, 'systemStock', e.target.valueAsNumber || 0)} disabled={!canEdit} className="w-24 text-center font-bold mx-auto bg-slate-50" min="0" />
                     </TableCell>
                     <TableCell className="text-center">
-                      <Input type="number" value={item.quantity === null ? '' : item.quantity} onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value === '' ? null : e.target.valueAsNumber)} disabled={!canEdit} className="w-24 text-center text-lg font-bold mx-auto" min="0" />
+                      <Input 
+                        type="number" 
+                        value={item.quantity === null ? '' : item.quantity} 
+                        onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value === '' ? null : e.target.valueAsNumber)} 
+                        disabled={!canEdit} 
+                        className="w-24 text-center text-lg font-bold mx-auto" 
+                        min="0" 
+                      />
                     </TableCell>
                     <TableCell className="text-center">
                       {item.quantity !== null && item.systemStock !== item.quantity && (
                         <Check className="h-6 w-6 text-red-600 mx-auto" />
                       )}
                     </TableCell>
-                    {/* NUEVA COLUMNA: OBSERVACIÓN OPERARIO */}
                     <TableCell>
                       <Input 
                         type="text" 
@@ -183,7 +229,6 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
                         className="min-w-[150px]"
                       />
                     </TableCell>
-                    {/* NUEVA COLUMNA: COMENTARIO ADMIN (Solo visible para admin) */}
                     {user?.role === 'admin' && (
                       <TableCell>
                         <Input 
