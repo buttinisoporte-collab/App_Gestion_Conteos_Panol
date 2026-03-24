@@ -16,7 +16,6 @@ import HistoryDashboard from './HistoryDashboard';
 import UserManagement from './UserManagement';
 import OperatorChart from './OperatorChart';
 import Settings from './Settings';
-import ReporteVisualizador from './ReporteVisualizador'; // <-- IMPORTANTE: Importamos la nueva vista
 
 export const getStatusBadge = (status: WeekStatus) => {
   const styles = {
@@ -39,7 +38,6 @@ export const AdminWeekDetailView: React.FC<{ week: WeekData; onBack: () => void;
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {/* CONTENEDOR CON ALTURA MÁXIMA PARA ENCABEZADO FIJO */}
                     <div className="max-h-[60vh] overflow-y-auto relative border rounded-md">
                         <Table className="relative w-full">
                            <TableHeader className="sticky top-0 bg-slate-100 z-20 shadow-sm outline outline-1 outline-slate-200">
@@ -76,7 +74,7 @@ export const AdminWeekDetailView: React.FC<{ week: WeekData; onBack: () => void;
                                 ))}
                             </TableBody>
                         </Table>
-                    </div> {/* <-- Faltaba cerrar este div */}
+                    </div>
                 </CardContent>
             </Card>
         </div>
@@ -94,8 +92,7 @@ const DashboardView: React.FC<{
     user: User | null;
     onShowSettings: () => void;
     onShowReset: () => void;
-    onShowVisualizador: () => void; // <-- Prop para el botón del visualizador
-}> = ({ onShowCreate, onSelectWeek, onPrintWeek, onShowHistory, onShowUsers, onFinalizeWeek, onDeleteCount, user, onShowSettings, onShowReset, onShowVisualizador }) => {
+}> = ({ onShowCreate, onSelectWeek, onPrintWeek, onShowHistory, onShowUsers, onFinalizeWeek, onDeleteCount, user, onShowSettings, onShowReset }) => {
     const { weeksData, refreshData, users, updateWeekComment } = useAppContext();
     const finalizedWeeks = weeksData.filter(w => w.status === WeekStatus.Finalizado).length;
     const totalWeeks = weeksData.length;
@@ -131,7 +128,6 @@ const DashboardView: React.FC<{
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <h2 className="text-3xl font-bold text-slate-800">Dashboard de Administrador</h2>
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
-                <Button onClick={onShowVisualizador} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">Cruce Stock Visualizador</Button>
                 <Button onClick={onShowHistory} variant="secondary">Ver Historial de Conteos</Button>
                 <Button onClick={onShowUsers} variant="secondary">Gestionar Usuarios</Button>
                 <Button onClick={onShowSettings} variant="outline">Configuración</Button>
@@ -259,8 +255,9 @@ const DashboardAdmin: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const[weekToFinalize, setWeekToFinalize] = useState<WeekData | null>(null);
     const [observation, setObservation] = useState('');
-    // Añadimos 'visualizador' a los estados de vista
-    const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings' | 'visualizador'>('dashboard');
+    
+    // Eliminado el 'visualizador' de los estados posibles
+    const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings'>('dashboard');
     const[selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
 
     const handleSelectWeek = (week: WeekData) => {
@@ -310,7 +307,6 @@ const DashboardAdmin: React.FC = () => {
         case 'history': return <HistoryDashboard onBack={handleBackToDashboard} />;
         case 'users': return <UserManagement onBack={handleBackToDashboard} />;
         case 'settings': return <Settings onBack={handleBackToDashboard} />;
-        case 'visualizador': return <ReporteVisualizador onBack={handleBackToDashboard} />; // <-- RENDERIZAMOS VISUALIZADOR
         case 'dashboard':
         default:
             return (
@@ -322,7 +318,6 @@ const DashboardAdmin: React.FC = () => {
                         onShowHistory={() => setView('history')}
                         onShowUsers={() => setView('users')}
                         onShowSettings={() => setView('settings')}
-                        onShowVisualizador={() => setView('visualizador')} // <-- PASAMOS LA PROP AL BOTÓN
                         onFinalizeWeek={openFinalizeModal}
                         onDeleteCount={() => setIsDeleteModalOpen(true)}
                         user={user}

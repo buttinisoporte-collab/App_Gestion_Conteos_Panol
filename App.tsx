@@ -24,8 +24,6 @@ const AppContent: React.FC = () => {
                 return <DashboardAdmin />;
             case 'operario':
                 return <OperarioView />;
-            case 'visualizador':
-                return <ReporteVisualizador />; // <-- El visualizador solo ve esto
             default:
                 return <Login />;
         }

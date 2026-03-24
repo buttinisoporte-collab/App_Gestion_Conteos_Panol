@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'operario' | 'visualizador'; 
+export type Role = 'admin' | 'operario';
 
 export interface User {
   id: string;
@@ -32,8 +32,8 @@ export interface Item {
   countedBy?: string | null;
   materialId?: string;
   auditLog?: AuditLogEntry[];
-  operatorObservation?: string; // NUEVO: Observación del operario
-  adminComment?: string;        // NUEVO: Comentario del administrador
+  operatorObservation?: string;
+  adminComment?: string;
 }
 
 export interface AuditLogEntry {
@@ -42,14 +42,6 @@ export interface AuditLogEntry {
   field: keyof Item;
   oldValue: any;
   newValue: any;
-}
-
-// 2. Crea esta nueva interfaz
-export interface ExternalStockItem {
-  id: string;
-  rubro: string;
-  lista: string;
-  stockSistema: number;
 }
 
 export enum WeekStatus {
@@ -71,8 +63,7 @@ export interface WeekData {
   finalizedBy?: string;
   finalizationDate?: string;
   finalizationObservation?: string;
-  adminComment?: string; // NUEVO: Comentario general de la semana
-  externalStock?: Record<string, ExternalStockItem>; // <-- NUEVO CAMPO
+  adminComment?: string;
 }
 
 export interface CountCycle {
@@ -100,7 +91,7 @@ export interface AppContextType {
   user: User | null;
   weeksData: WeekData[];
   historicalCounts: CountCycle[];
-  users: User[];  
+  users: User[];
   settings: SettingsData;
   login: (username: string, password?: string) => Promise<boolean>;
   logout: () => void;
@@ -114,8 +105,7 @@ export interface AppContextType {
   updateUser: (userId: string, updatedUser: Partial<User>) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   updateWeekItems: (weekId: string, newItems: Item[]) => Promise<void>;
-  updateWeekComment: (weekId: string, comment: string) => Promise<void>; // NUEVO
-  saveExternalStock: (weekId: string, stockData: Record<string, ExternalStockItem>) => Promise<void>; // <-- NUEVO
+  updateWeekComment: (weekId: string, comment: string) => Promise<void>;
   deleteCurrentCount: (cycleId?: string) => Promise<void>;
   refreshData: () => Promise<void>;
   resetApplicationData: () => Promise<void>;
