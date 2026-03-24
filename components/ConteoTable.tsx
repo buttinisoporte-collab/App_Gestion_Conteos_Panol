@@ -17,25 +17,21 @@ interface ConteoTableProps {
 }
 
 const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
-  // Usamos updateWeekItems para guardar todo en bloque en vez de uno por uno
   const { user, updateWeekItems, weeksData, finalizeWeek } = useAppContext();
   
   const currentWeekData = weeksData.find(w => w.id === week.id) || week;
   
-  // 1. Inicializamos el estado local UNA SOLA VEZ para evitar que el cursor salte
   const[editedItems, setEditedItems] = useState<Item[]>(() => JSON.parse(JSON.stringify(currentWeekData.items)));
   
   const [isFinalized, setIsFinalized] = useState(currentWeekData.status === 'Finalizado');
   const [view, setView] = useState<'table' | 'report' | 'modify'>('table');
-  const [showSaveModal, setShowSaveModal] = useState(false);
+  const[showSaveModal, setShowSaveModal] = useState(false);
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const[searchTerm, setSearchTerm] = useState('');
   const [itemOrder, setItemOrder] = useState<string[]>([]);
   
-  // 2. Estado para saber si hay cambios pendientes de guardar a Firebase
   const[hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // 3. Ya NO sobrescribimos editedItems cuando cambia el contexto global para no interrumpir el tecleo
   useEffect(() => {
     const updatedWeek = weeksData.find(w => w.id === week.id);
     if (updatedWeek) {
@@ -55,7 +51,6 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
     setItemOrder(initialSortedIds);
   },[week.id]);
 
-  // 4. AUTOGUARDADO EN SEGUNDO PLANO (Espera 1.5 segundos sin teclear para guardar)
   useEffect(() => {
     if (!hasUnsavedChanges || isFinalized) return;
     
@@ -67,7 +62,6 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
     return () => clearTimeout(timeoutId);
   },[editedItems, hasUnsavedChanges, isFinalized, week.id, updateWeekItems]);
 
-  // 5. Cambio INSTANTÁNEO en la interfaz local (sin lag ni saltos de cursor)
   const handleItemChange = (itemId: string, field: keyof Item, value: string | number | null) => {
     setEditedItems(prevItems => prevItems.map(item => {
       if (item.id === itemId) {
@@ -84,7 +78,7 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
   };
 
   const handleSave = () => {
-    updateWeekItems(week.id, editedItems); // Forzamos el guardado
+    updateWeekItems(week.id, editedItems);
     setHasUnsavedChanges(false);
     setShowSaveModal(true);
     setTimeout(() => {
@@ -98,7 +92,6 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
   };
 
   const confirmFinalize = async () => {
-    // Asegurarse de guardar antes de finalizar
     if (hasUnsavedChanges) {
       await updateWeekItems(week.id, editedItems);
       setHasUnsavedChanges(false);
@@ -175,78 +168,81 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
             <span className="text-sm text-slate-500 ml-4">Los ítems ya contados aparecen al final de la lista.</span>
           </div>
           
-          <div className="bg-white p-4 rounded-lg shadow-md overflow-y-auto flex-grow">
-            <Table>
-              <TableHeader className="sticky top-0 bg-white z-10">
-                <TableRow>
-                  <TableHead className="hidden md:table-cell">ID Material</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
-                  <TableHead className="text-center">Stock Sistema</TableHead>
-                  <TableHead className="text-center">Cantidad Contada</TableHead>
-                  <TableHead className="text-center">Diferencia</TableHead>
-                  <TableHead>Observación Operario</TableHead>
-                  {user?.role === 'admin' && <TableHead>Comentario Admin</TableHead>}
-                  <TableHead className="hidden lg:table-cell">Fecha Conteo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedAndFilteredItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="hidden md:table-cell font-mono">{item.id}</TableCell>
-                    <TableCell className="font-medium">
-                        {item.description}
-                        <div className="text-xs text-slate-500 font-normal">{item.manufacturerCode}</div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Input type="text" value={item.location} onChange={(e) => handleItemChange(item.id, 'location', e.target.value)} disabled={!canEdit} className="w-32 font-mono" />
-                    </TableCell>
-                    <TableCell className="text-center">
-                       <Input type="number" value={item.systemStock} onChange={(e) => handleItemChange(item.id, 'systemStock', e.target.valueAsNumber || 0)} disabled={!canEdit} className="w-24 text-center font-bold mx-auto bg-slate-50" min="0" />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Input 
-                        type="number" 
-                        value={item.quantity === null ? '' : item.quantity} 
-                        onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value === '' ? null : e.target.valueAsNumber)} 
-                        disabled={!canEdit} 
-                        className="w-24 text-center text-lg font-bold mx-auto" 
-                        min="0" 
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {item.quantity !== null && item.systemStock !== item.quantity && (
-                        <Check className="h-6 w-6 text-red-600 mx-auto" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Input 
-                        type="text" 
-                        placeholder="Observación..." 
-                        value={item.operatorObservation || ''} 
-                        onChange={(e) => handleItemChange(item.id, 'operatorObservation', e.target.value)} 
-                        disabled={!canEdit} 
-                        className="min-w-[150px]"
-                      />
-                    </TableCell>
-                    {user?.role === 'admin' && (
+          {/* CONTENEDOR NUEVO CON ALTURA FIJA PARA SCROLL INTERNO */}
+          <div className="bg-white rounded-lg shadow-md border overflow-hidden flex flex-col h-[calc(100vh-230px)]">
+            <div className="overflow-y-auto flex-grow">
+              <Table className="relative w-full">
+                <TableHeader className="sticky top-0 bg-slate-100 z-20 shadow-sm outline outline-1 outline-slate-200">
+                  <TableRow>
+                    <TableHead className="hidden md:table-cell">ID Material</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
+                    <TableHead className="text-center">Stock Sistema</TableHead>
+                    <TableHead className="text-center">Cantidad Contada</TableHead>
+                    <TableHead className="text-center">Diferencia</TableHead>
+                    <TableHead>Observación Operario</TableHead>
+                    {user?.role === 'admin' && <TableHead>Comentario Admin</TableHead>}
+                    <TableHead className="hidden lg:table-cell">Fecha Conteo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedAndFilteredItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="hidden md:table-cell font-mono">{item.id}</TableCell>
+                      <TableCell className="font-medium">
+                          {item.description}
+                          <div className="text-xs text-slate-500 font-normal">{item.manufacturerCode}</div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Input type="text" value={item.location} onChange={(e) => handleItemChange(item.id, 'location', e.target.value)} disabled={!canEdit} className="w-32 font-mono" />
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <Input type="number" value={item.systemStock} onChange={(e) => handleItemChange(item.id, 'systemStock', e.target.valueAsNumber || 0)} disabled={!canEdit} className="w-24 text-center font-bold mx-auto bg-slate-50" min="0" />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Input 
+                          type="number" 
+                          value={item.quantity === null ? '' : item.quantity} 
+                          onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value === '' ? null : e.target.valueAsNumber)} 
+                          disabled={!canEdit} 
+                          className="w-24 text-center text-lg font-bold mx-auto" 
+                          min="0" 
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {item.quantity !== null && item.systemStock !== item.quantity && (
+                          <Check className="h-6 w-6 text-red-600 mx-auto" />
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Input 
                           type="text" 
-                          placeholder="Nota interna admin..." 
-                          value={item.adminComment || ''} 
-                          onChange={(e) => handleItemChange(item.id, 'adminComment', e.target.value)} 
-                          className="min-w-[150px] bg-yellow-50"
+                          placeholder="Observación..." 
+                          value={item.operatorObservation || ''} 
+                          onChange={(e) => handleItemChange(item.id, 'operatorObservation', e.target.value)} 
+                          disabled={!canEdit} 
+                          className="min-w-[150px]"
                         />
                       </TableCell>
-                    )}
-                    <TableCell className="hidden lg:table-cell text-sm text-slate-500">
-                        {item.countedDate ? new Date(item.countedDate).toLocaleDateString('es-AR') : ''}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      {user?.role === 'admin' && (
+                        <TableCell>
+                          <Input 
+                            type="text" 
+                            placeholder="Nota interna admin..." 
+                            value={item.adminComment || ''} 
+                            onChange={(e) => handleItemChange(item.id, 'adminComment', e.target.value)} 
+                            className="min-w-[150px] bg-yellow-50"
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell className="hidden lg:table-cell text-sm text-slate-500">
+                          {item.countedDate ? new Date(item.countedDate).toLocaleDateString('es-AR') : ''}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </div>
       )}

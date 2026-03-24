@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'operario';
+export type Role = 'admin' | 'operario' | 'visualizador'; 
 
 export interface User {
   id: string;
@@ -44,6 +44,14 @@ export interface AuditLogEntry {
   newValue: any;
 }
 
+// 2. Crea esta nueva interfaz
+export interface ExternalStockItem {
+  id: string;
+  rubro: string;
+  lista: string;
+  stockSistema: number;
+}
+
 export enum WeekStatus {
   Bloqueado = 'Bloqueado',
   Pendiente = 'Pendiente',
@@ -64,6 +72,7 @@ export interface WeekData {
   finalizationDate?: string;
   finalizationObservation?: string;
   adminComment?: string; // NUEVO: Comentario general de la semana
+  externalStock?: Record<string, ExternalStockItem>; // <-- NUEVO CAMPO
 }
 
 export interface CountCycle {
@@ -91,7 +100,7 @@ export interface AppContextType {
   user: User | null;
   weeksData: WeekData[];
   historicalCounts: CountCycle[];
-  users: User[];
+  users: User[];  
   settings: SettingsData;
   login: (username: string, password?: string) => Promise<boolean>;
   logout: () => void;
@@ -106,6 +115,7 @@ export interface AppContextType {
   deleteUser: (userId: string) => Promise<void>;
   updateWeekItems: (weekId: string, newItems: Item[]) => Promise<void>;
   updateWeekComment: (weekId: string, comment: string) => Promise<void>; // NUEVO
+  saveExternalStock: (weekId: string, stockData: Record<string, ExternalStockItem>) => Promise<void>; // <-- NUEVO
   deleteCurrentCount: (cycleId?: string) => Promise<void>;
   refreshData: () => Promise<void>;
   resetApplicationData: () => Promise<void>;

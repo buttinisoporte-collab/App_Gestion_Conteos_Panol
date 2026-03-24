@@ -1,70 +1,48 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
-import { WeekData, User } from '../types';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
+import { WeekData } from '../types';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 
-interface OperatorChartProps {
-  weeksData: WeekData[];
-  users: User[];
-}
-
-const OperatorChart: React.FC<OperatorChartProps> = ({ weeksData, users }) => {
-  const operatorCounts: { [key: string]: number } = {};
-
-  const getOperatorName = (fullName: string) => {
-    const user = users.find(u => u.fullName === fullName);
-    return user ? user.fullName : 'Desconocido';
-  };
+export default function OperatorChart({ weeksData }: { weeksData: WeekData[] }) {
+  const counts: Record<string, number> = {};
 
   weeksData.forEach(week => {
     week.items.forEach(item => {
-      if (item.quantity !== null && item.quantity > 0 && item.auditLog) {
-        const lastCountLog = item.auditLog
-          .filter(log => log.field === 'quantity' && log.newValue !== null && log.newValue > 0)
-          .pop();
-
-        if (lastCountLog) {
-          const operatorName = getOperatorName(lastCountLog.user);
-          if (users.some(u => u.fullName === operatorName && u.role === 'operario')) {
-            operatorCounts[operatorName] = (operatorCounts[operatorName] || 0) + 1;
-          }
-        }
+      if (item.quantity !== null && item.countedBy) {
+        // .trim() soluciona el problema de usuarios como "uprueba " vs "uprueba"
+        const name = item.countedBy.trim();
+        counts[name] = (counts[name] || 0) + 1;
       }
     });
   });
 
-  const chartData = Object.keys(operatorCounts).map(operatorName => ({
-    name: operatorName,
-    'Ítems Contados': operatorCounts[operatorName],
-  }));
+  const data = Object.keys(counts).map(name => ({
+    name: name,
+    Contados: counts[name]
+  })).sort((a, b) => b.Contados - a.Contados);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ítems Contados por Operario</CardTitle>
+        <CardTitle className="text-sm font-medium">Ítems Contados por Operario</CardTitle>
       </CardHeader>
       <CardContent>
-        {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="Ítems Contados" fill="#3b82f6">
-                <LabelList dataKey="Ítems Contados" position="top" />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex items-center justify-center h-[300px]">
-            <p className="text-slate-500">No hay datos de operarios para mostrar.</p>
+        {data.length > 0 ? (
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 12}} />
+                <Tooltip cursor={{fill: '#f1f5f9'}} />
+                <Bar dataKey="Contados" fill="#0033a0" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
+        ) : (
+          <p className="text-center text-slate-500 py-8 text-sm">No hay datos de operarios para mostrar.</p>
         )}
       </CardContent>
     </Card>
   );
-};
-
-export default OperatorChart;
+}

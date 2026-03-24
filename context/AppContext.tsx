@@ -147,6 +147,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     const updatedCycle = { ...countCycle, weeks: updatedWeeks };
+
+    const saveExternalStock = async (weekId: string, stockData: Record<string, ExternalStockItem>) => {
+    if (!user || !countCycle) return;
+    const updatedWeeks = countCycle.weeks.map(w => 
+      w.id === weekId ? { ...w, externalStock: stockData } : w
+    );
+    const updatedCycle = { ...countCycle, weeks: updatedWeeks };
+    const success = await dataService.saveCountCycle(updatedCycle);
+    if (success) setCountCycle(updatedCycle);
+  };
     
     // En Firebase simplemente guardamos el documento completo del ciclo
     const success = await dataService.saveCountCycle(updatedCycle);

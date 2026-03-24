@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import * as XLSX from 'xlsx'; // LIBRERÍA DE EXCEL AGREGADA
+import * as XLSX from 'xlsx';
 import DashboardIndicators from './DashboardIndicators';
 import { useAppContext } from '../context/AppContext';
 import { WeekStatus, WeekData, User } from '../types';
@@ -16,6 +16,7 @@ import HistoryDashboard from './HistoryDashboard';
 import UserManagement from './UserManagement';
 import OperatorChart from './OperatorChart';
 import Settings from './Settings';
+import ReporteVisualizador from './ReporteVisualizador'; // <-- IMPORTANTE: Importamos la nueva vista
 
 export const getStatusBadge = (status: WeekStatus) => {
   const styles = {
@@ -38,41 +39,44 @@ export const AdminWeekDetailView: React.FC<{ week: WeekData; onBack: () => void;
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="hidden sm:table-cell">ID Material</TableHead>
-                                <TableHead>Descripción</TableHead>
-                                <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
-                                <TableHead className="hidden sm:table-cell text-center">Stock</TableHead>
-                                <TableHead className="text-center">Contado</TableHead>
-                                <TableHead>Obs. Operario</TableHead>
-                                <TableHead>Comentario Admin</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {week.items.map((item) => (
-                                <TableRow key={item.id} className={item.quantity !== null && item.systemStock !== item.quantity ? 'bg-red-50' : ''}>
-                                    <TableCell className="font-mono sm:table-cell hidden">{item.id}</TableCell>
-                                    <TableCell className="font-medium">
-                                        <div className="sm:hidden">
-                                            <span className="font-bold">{item.id}</span> - {item.location}
-                                        </div>
-                                        {item.description}
-                                        <div className="text-xs text-slate-500 font-normal">{item.manufacturerCode}</div>
-                                    </TableCell>
-                                    <TableCell className="font-mono sm:table-cell hidden">{item.location}</TableCell>
-                                    <TableCell className="text-center font-semibold text-slate-600 sm:table-cell hidden">{item.systemStock}</TableCell>
-                                    <TableCell className={`text-center font-bold ${item.quantity !== null && item.systemStock !== item.quantity ? 'text-red-600' : 'text-green-700'}`}>
-                                        <span className="sm:hidden font-normal text-slate-500">Contado: </span>
-                                        {item.quantity ?? 'No contado'}
-                                    </TableCell>
-                                    <TableCell className="text-sm text-slate-600">{item.operatorObservation || '-'}</TableCell>
-                                    <TableCell className="text-sm font-semibold text-amber-700">{item.adminComment || '-'}</TableCell>
+                    {/* CONTENEDOR CON ALTURA MÁXIMA PARA ENCABEZADO FIJO */}
+                    <div className="max-h-[60vh] overflow-y-auto relative border rounded-md">
+                        <Table className="relative w-full">
+                           <TableHeader className="sticky top-0 bg-slate-100 z-20 shadow-sm outline outline-1 outline-slate-200">
+                                <TableRow>
+                                    <TableHead className="hidden sm:table-cell">ID Material</TableHead>
+                                    <TableHead>Descripción</TableHead>
+                                    <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
+                                    <TableHead className="hidden sm:table-cell text-center">Stock</TableHead>
+                                    <TableHead className="text-center">Contado</TableHead>
+                                    <TableHead>Obs. Operario</TableHead>
+                                    <TableHead>Comentario Admin</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {week.items.map((item) => (
+                                    <TableRow key={item.id} className={item.quantity !== null && item.systemStock !== item.quantity ? 'bg-red-50' : ''}>
+                                        <TableCell className="font-mono sm:table-cell hidden">{item.id}</TableCell>
+                                        <TableCell className="font-medium">
+                                            <div className="sm:hidden">
+                                                <span className="font-bold">{item.id}</span> - {item.location}
+                                            </div>
+                                            {item.description}
+                                            <div className="text-xs text-slate-500 font-normal">{item.manufacturerCode}</div>
+                                        </TableCell>
+                                        <TableCell className="font-mono sm:table-cell hidden">{item.location}</TableCell>
+                                        <TableCell className="text-center font-semibold text-slate-600 sm:table-cell hidden">{item.systemStock}</TableCell>
+                                        <TableCell className={`text-center font-bold ${item.quantity !== null && item.systemStock !== item.quantity ? 'text-red-600' : 'text-green-700'}`}>
+                                            <span className="sm:hidden font-normal text-slate-500">Contado: </span>
+                                            {item.quantity ?? 'No contado'}
+                                        </TableCell>
+                                        <TableCell className="text-sm text-slate-600">{item.operatorObservation || '-'}</TableCell>
+                                        <TableCell className="text-sm font-semibold text-amber-700">{item.adminComment || '-'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div> {/* <-- Faltaba cerrar este div */}
                 </CardContent>
             </Card>
         </div>
@@ -90,8 +94,9 @@ const DashboardView: React.FC<{
     user: User | null;
     onShowSettings: () => void;
     onShowReset: () => void;
-}> = ({ onShowCreate, onSelectWeek, onPrintWeek, onShowHistory, onShowUsers, onFinalizeWeek, onDeleteCount, user, onShowSettings, onShowReset }) => {
-    const { weeksData, refreshData, users, resetApplicationData, updateWeekComment } = useAppContext();
+    onShowVisualizador: () => void; // <-- Prop para el botón del visualizador
+}> = ({ onShowCreate, onSelectWeek, onPrintWeek, onShowHistory, onShowUsers, onFinalizeWeek, onDeleteCount, user, onShowSettings, onShowReset, onShowVisualizador }) => {
+    const { weeksData, refreshData, users, updateWeekComment } = useAppContext();
     const finalizedWeeks = weeksData.filter(w => w.status === WeekStatus.Finalizado).length;
     const totalWeeks = weeksData.length;
     const progressPercentage = totalWeeks > 0 ? Math.round((finalizedWeeks / totalWeeks) * 100) : 0;
@@ -101,7 +106,6 @@ const DashboardView: React.FC<{
       .flatMap(w => w.items)
       .filter(item => item.countedDate && item.countedDate.startsWith(today) && item.quantity !== null && item.quantity > 0).length;
 
-    // NUEVO: Función para generar Excel
     const handleExportExcel = (week: WeekData) => {
       const data = week.items.map(item => ({
           'ID Material': item.id,
@@ -127,6 +131,7 @@ const DashboardView: React.FC<{
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <h2 className="text-3xl font-bold text-slate-800">Dashboard de Administrador</h2>
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                <Button onClick={onShowVisualizador} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">Cruce Stock Visualizador</Button>
                 <Button onClick={onShowHistory} variant="secondary">Ver Historial de Conteos</Button>
                 <Button onClick={onShowUsers} variant="secondary">Gestionar Usuarios</Button>
                 <Button onClick={onShowSettings} variant="outline">Configuración</Button>
@@ -164,7 +169,7 @@ const DashboardView: React.FC<{
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">Progreso General</CardTitle>
+                      <CardTitle className="text-sm font-medium">Progreso General (Semanas)</CardTitle>
                       <PieChart className="h-4 w-4 text-slate-500" />
                     </CardHeader>
                     <CardContent>
@@ -222,7 +227,6 @@ const DashboardView: React.FC<{
                                   <Button variant="outline" size="sm" onClick={() => onPrintWeek(week)} title="Imprimir PDF">
                                       <Printer className="h-4 w-4" />
                                   </Button>
-                                  {/* BOTÓN PARA DESCARGAR EXCEL */}
                                   <Button variant="outline" size="sm" onClick={() => handleExportExcel(week)} className="text-green-700 border-green-200 hover:bg-green-50" title="Descargar Excel">
                                       Excel
                                   </Button>
@@ -248,14 +252,15 @@ const DashboardView: React.FC<{
 };
 
 const DashboardAdmin: React.FC = () => {
-    const { finalizeWeek, deleteCurrentCount, user, weeksData, refreshData, resetApplicationData } = useAppContext();
+    const { finalizeWeek, deleteCurrentCount, user, weeksData, resetApplicationData } = useAppContext();
     const[isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [showResetDataModal, setShowResetDataModal] = useState(false);
-    const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+    const[showResetDataModal, setShowResetDataModal] = useState(false);
+    const[deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const[weekToFinalize, setWeekToFinalize] = useState<WeekData | null>(null);
     const [observation, setObservation] = useState('');
-    const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings'>('dashboard');
+    // Añadimos 'visualizador' a los estados de vista
+    const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings' | 'visualizador'>('dashboard');
     const[selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
 
     const handleSelectWeek = (week: WeekData) => {
@@ -305,6 +310,7 @@ const DashboardAdmin: React.FC = () => {
         case 'history': return <HistoryDashboard onBack={handleBackToDashboard} />;
         case 'users': return <UserManagement onBack={handleBackToDashboard} />;
         case 'settings': return <Settings onBack={handleBackToDashboard} />;
+        case 'visualizador': return <ReporteVisualizador onBack={handleBackToDashboard} />; // <-- RENDERIZAMOS VISUALIZADOR
         case 'dashboard':
         default:
             return (
@@ -316,6 +322,7 @@ const DashboardAdmin: React.FC = () => {
                         onShowHistory={() => setView('history')}
                         onShowUsers={() => setView('users')}
                         onShowSettings={() => setView('settings')}
+                        onShowVisualizador={() => setView('visualizador')} // <-- PASAMOS LA PROP AL BOTÓN
                         onFinalizeWeek={openFinalizeModal}
                         onDeleteCount={() => setIsDeleteModalOpen(true)}
                         user={user}
