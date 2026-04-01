@@ -19,7 +19,10 @@ import Settings from './Settings';
 
 export const getStatusBadge = (status: WeekStatus) => {
   const styles = {
-    [WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',[WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',[WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',[WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
+    [WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',
+    [WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',
+    [WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',
+    [WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
   };
   return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styles[status]}`}>{status}</span>;
 };
@@ -194,49 +197,79 @@ const DashboardView: React.FC<{
                   <CardHeader>
                     <CardTitle>Estado de Semanas (Conteo Actual)</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Semana</TableHead>
                           <TableHead>Estado</TableHead>
-                          <TableHead>Comentario de Admin</TableHead>
+                          <TableHead className="min-w-[280px]">INDICADORES SEMANALES</TableHead>
                           <TableHead className="text-center">Descargas</TableHead>
+                          <TableHead>Comentario de Admin</TableHead>
                           <TableHead className="text-right">Finalizar</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {weeksData.map((week) => (
-                          <TableRow key={week.id}>
-                            <TableCell className="font-medium cursor-pointer hover:underline text-corporate-blue" onClick={() => week.status !== WeekStatus.Bloqueado && onSelectWeek(week)}>{week.name}</TableCell>
-                            <TableCell>{getStatusBadge(week.status)}</TableCell>
-                            <TableCell>
-                               <Input 
-                                  defaultValue={week.adminComment || ''}
-                                  placeholder="Escriba una nota y presione Enter o haga clic fuera..."
-                                  onBlur={(e) => updateWeekComment(week.id, e.target.value)}
-                                  className="min-w-[200px] bg-slate-50 text-sm"
-                               />
-                            </TableCell>
-                            <TableCell className="text-center">
-                                <div className="flex justify-center gap-2">
-                                  <Button variant="outline" size="sm" onClick={() => onPrintWeek(week)} title="Imprimir PDF">
-                                      <Printer className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="outline" size="sm" onClick={() => handleExportExcel(week)} className="text-green-700 border-green-200 hover:bg-green-50" title="Descargar Excel">
-                                      Excel
-                                  </Button>
+                        {weeksData.map((week) => {
+                          // Cálculos de KPI individuales para esta semana
+                          const weekTotal = week.items.length;
+                          const weekCounted = week.items.filter(i => i.quantity !== null).length;
+                          const weekDeviations = week.items.filter(i => i.quantity !== null && i.quantity !== i.systemStock).length;
+                          const weekCompPct = weekTotal > 0 ? ((weekCounted / weekTotal) * 100).toFixed(2) : '0.00';
+                          const weekDevPct = weekCounted > 0 ? ((weekDeviations / weekCounted) * 100).toFixed(2) : '0.00';
+
+                          return (
+                            <TableRow key={week.id}>
+                              <TableCell className="font-medium cursor-pointer hover:underline text-corporate-blue" onClick={() => week.status !== WeekStatus.Bloqueado && onSelectWeek(week)}>{week.name}</TableCell>
+                              <TableCell>{getStatusBadge(week.status)}</TableCell>
+                              
+                              {/* NUEVA COLUMNA: INDICADORES SEMANALES */}
+                              <TableCell className="p-2">
+                                <div className="flex gap-2 justify-start min-w-[260px]">
+                                  <div className="bg-white border border-slate-200 rounded p-2 flex-1 shadow-sm">
+                                    <p className="text-[10px] text-slate-500 font-bold mb-1">CUMPLIMIENTO</p>
+                                    <div className="text-lg font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
+                                    <p className="text-[9px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
+                                  </div>
+                                  <div className="bg-white border border-slate-200 rounded p-2 flex-1 shadow-sm">
+                                    <p className="text-[10px] text-slate-500 font-bold mb-1">DESVÍOS</p>
+                                    <div className="text-lg font-bold text-red-600 leading-none">{weekDevPct}%</div>
+                                    <p className="text-[9px] text-slate-400 mt-1">{weekDeviations} con dif.</p>
+                                  </div>
                                 </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                                {(week.status === WeekStatus.EnProgreso || week.status === WeekStatus.Pendiente) && (
-                                    <Button size="sm" onClick={() => onFinalizeWeek(week)} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">
-                                        Finalizar Semana
+                              </TableCell>
+
+                              <TableCell className="text-center">
+                                  <div className="flex justify-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => onPrintWeek(week)} title="Imprimir PDF">
+                                        <Printer className="h-4 w-4" />
                                     </Button>
-                                )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                                    <Button variant="outline" size="sm" onClick={() => handleExportExcel(week)} className="text-green-700 border-green-200 hover:bg-green-50" title="Descargar Excel">
+                                        Excel
+                                    </Button>
+                                  </div>
+                              </TableCell>
+                              
+                              {/* COLUMNA MOVIDA: COMENTARIO ADMIN */}
+                              <TableCell>
+                                 <Input 
+                                    defaultValue={week.adminComment || ''}
+                                    placeholder="Escriba una nota y presione Enter o haga clic fuera..."
+                                    onBlur={(e) => updateWeekComment(week.id, e.target.value)}
+                                    className="min-w-[220px] bg-slate-50 text-sm"
+                                 />
+                              </TableCell>
+
+                              <TableCell className="text-right">
+                                  {(week.status === WeekStatus.EnProgreso || week.status === WeekStatus.Pendiente) && (
+                                      <Button size="sm" onClick={() => onFinalizeWeek(week)} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">
+                                          Finalizar Semana
+                                      </Button>
+                                  )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -256,7 +289,6 @@ const DashboardAdmin: React.FC = () => {
     const[weekToFinalize, setWeekToFinalize] = useState<WeekData | null>(null);
     const [observation, setObservation] = useState('');
     
-    // Eliminado el 'visualizador' de los estados posibles
     const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings'>('dashboard');
     const[selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
 
