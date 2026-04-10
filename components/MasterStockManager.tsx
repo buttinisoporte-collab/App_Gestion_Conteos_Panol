@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/Card';
 import { Button } from './ui/Button';
 import { MasterStockItem } from '../types';
 
 export default function MasterStockManager({ onBack }: { onBack: () => void }) {
   const { updateMasterStock, masterStockDate } = useAppContext();
-  const [pasteData, setPasteData] = useState('');
+  const[pasteData, setPasteData] = useState('');
 
   const handleProcess = async () => {
      const lines = pasteData.trim().split('\n');
@@ -37,19 +37,27 @@ export default function MasterStockManager({ onBack }: { onBack: () => void }) {
         <Button onClick={onBack} variant="secondary" className="mb-4">&larr; Volver al Dashboard</Button>
         <Card>
            <CardHeader>
-               <CardTitle className="flex justify-between items-center">
-                   Cargar Stock Maestro General
-                   {masterStockDate && (
-                       <span className="text-sm font-normal text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                           Última carga: {new Date(masterStockDate).toLocaleString('es-AR')}
-                       </span>
-                   )}
-               </CardTitle>
+               <CardTitle>Cargar Stock Maestro General</CardTitle>
+               <CardDescription className="text-corporate-blue font-bold">
+                   Última actualización en base de datos: {masterStockDate ? new Date(masterStockDate).toLocaleString('es-AR') : 'Nunca'}
+               </CardDescription>
            </CardHeader>
            <CardContent>
-              <p className="mb-4 text-sm text-slate-600">Pegue aquí los datos desde su archivo Excel. El sistema espera 4 columnas: <b>ID_Material | Descripción | Ubicación | TIPO</b></p>
-              <textarea className="w-full h-64 p-3 border rounded-md font-mono text-sm bg-slate-50" placeholder="Pegue los datos aquí..." value={pasteData} onChange={e => setPasteData(e.target.value)} />
-              <Button onClick={handleProcess} className="mt-4 bg-corporate-blue text-white hover:bg-corporate-blue/90">Procesar y Guardar Base de Datos</Button>
+              <p className="mb-4 text-sm text-slate-600">
+                  Pegue aquí los datos desde su archivo Excel. El sistema espera exactamente 4 columnas en este orden:<br/>
+                  <b>1. ID_Material | 2. Descripción | 3. Ubicacion | 4. TIPO</b>
+              </p>
+              <textarea
+                 className="w-full h-64 p-3 border rounded-md font-mono text-sm bg-slate-50"
+                 placeholder="Pegue los datos aquí..."
+                 value={pasteData}
+                 onChange={e => setPasteData(e.target.value)}
+              />
+              <div className="mt-4 flex gap-2">
+                 <Button onClick={handleProcess} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">
+                     Procesar y Guardar Base de Datos
+                 </Button>
+              </div>
            </CardContent>
         </Card>
      </div>

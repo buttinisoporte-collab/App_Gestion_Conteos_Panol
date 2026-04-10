@@ -21,60 +21,98 @@ import MasterStockManager from './MasterStockManager';
 const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
 
 export const getStatusBadge = (status: WeekStatus) => {
-  const styles = {[WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',[WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',[WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',[WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
-  };
+  const styles = { [WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',[WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',[WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',[WeekStatus.Finalizado]: 'bg-green-200 text-green-800' };
   return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styles[status]}`}>{status}</span>;
 };
 
 export const AdminWeekDetailView: React.FC<{ week: WeekData; onBack: () => void; }> = ({ week, onBack }) => {
     const { masterStock } = useAppContext();
+    const [filters, setFilters] = useState({ id: '', desc: '', loc: '', type: '', stock: '', counted: '', obs: '', admin: '' });
+
+    const filteredItems = week.items.filter(item => {
+        const realId = getRealId(item.id);
+        const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
+        return (
+            item.id.toLowerCase().includes(filters.id.toLowerCase()) &&
+            item.description.toLowerCase().includes(filters.desc.toLowerCase()) &&
+            item.location.toLowerCase().includes(filters.loc.toLowerCase()) &&
+            tipo.toLowerCase().includes(filters.type.toLowerCase()) &&
+            String(item.systemStock).toLowerCase().includes(filters.stock.toLowerCase()) &&
+            String(item.quantity ?? '').toLowerCase().includes(filters.counted.toLowerCase()) &&
+            (item.operatorObservation || '').toLowerCase().includes(filters.obs.toLowerCase()) &&
+            (item.adminComment || '').toLowerCase().includes(filters.admin.toLowerCase())
+        );
+    });
+
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Button onClick={onBack} variant="secondary" className="mb-4">&larr; Volver</Button>
             <Card>
                 <CardHeader>
                     <CardTitle>Detalle del Conteo - {week.name}</CardTitle>
-                    <CardDescription>
-                        Vista detallada. Modificado por última vez por {week.lastModifiedBy || 'nadie'} el {week.lastModifiedDate ? new Date(week.lastModifiedDate).toLocaleString('es-AR') : 'N/A'}.
-                    </CardDescription>
+                    <CardDescription>Utilice los cuadros de texto en las cabeceras para filtrar la información. Mostrando {filteredItems.length} ítems.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="max-h-[60vh] overflow-y-auto relative border rounded-md">
                         <Table className="relative w-full">
                            <TableHeader className="sticky top-0 bg-slate-100 z-20 shadow-sm outline outline-1 outline-slate-200">
                                 <TableRow>
-                                    <TableHead className="hidden sm:table-cell">ID Material</TableHead>
-                                    <TableHead>Descripción</TableHead>
-                                    <TableHead className="text-center">Tipo</TableHead>
-                                    <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
-                                    <TableHead className="hidden sm:table-cell text-center">Stock</TableHead>
-                                    <TableHead className="text-center">Contado</TableHead>
-                                    <TableHead>Obs. Operario</TableHead>
-                                    <TableHead>Comentario Admin</TableHead>
+                                    <TableHead className="hidden sm:table-cell align-top p-2">
+                                        <div className="mb-1 text-xs">ID Material</div>
+                                        <Input className="h-6 text-[10px] px-1 w-full" placeholder="Filtrar..." value={filters.id} onChange={e => setFilters({...filters, id: e.target.value})} />
+                                    </TableHead>
+                                    <TableHead className="align-top p-2">
+                                        <div className="mb-1 text-xs">Descripción</div>
+                                        <Input className="h-6 text-[10px] px-1 w-full" placeholder="Filtrar..." value={filters.desc} onChange={e => setFilters({...filters, desc: e.target.value})} />
+                                    </TableHead>
+                                    <TableHead className="hidden sm:table-cell align-top p-2">
+                                        <div className="mb-1 text-xs">Ubicación</div>
+                                        <Input className="h-6 text-[10px] px-1 w-full" placeholder="Filtrar..." value={filters.loc} onChange={e => setFilters({...filters, loc: e.target.value})} />
+                                    </TableHead>
+                                    <TableHead className="hidden sm:table-cell text-center align-top p-2">
+                                        <div className="mb-1 text-xs">Tipo</div>
+                                        <Input className="h-6 text-[10px] px-1 text-center w-12 mx-auto" placeholder="Tipo" value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})} />
+                                    </TableHead>
+                                    <TableHead className="hidden sm:table-cell text-center align-top p-2">
+                                        <div className="mb-1 text-xs">Stock</div>
+                                        <Input className="h-6 text-[10px] px-1 text-center w-16 mx-auto" placeholder="Stock" value={filters.stock} onChange={e => setFilters({...filters, stock: e.target.value})} />
+                                    </TableHead>
+                                    <TableHead className="text-center align-top p-2">
+                                        <div className="mb-1 text-xs">Contado</div>
+                                        <Input className="h-6 text-[10px] px-1 text-center w-16 mx-auto" placeholder="Cont." value={filters.counted} onChange={e => setFilters({...filters, counted: e.target.value})} />
+                                    </TableHead>
+                                    <TableHead className="align-top p-2">
+                                        <div className="mb-1 text-xs">Obs. Operario</div>
+                                        <Input className="h-6 text-[10px] px-1 w-full" placeholder="Filtrar..." value={filters.obs} onChange={e => setFilters({...filters, obs: e.target.value})} />
+                                    </TableHead>
+                                    <TableHead className="align-top p-2">
+                                        <div className="mb-1 text-xs">Comentario Admin</div>
+                                        <Input className="h-6 text-[10px] px-1 w-full" placeholder="Filtrar..." value={filters.admin} onChange={e => setFilters({...filters, admin: e.target.value})} />
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {week.items.map((item) => {
+                                {filteredItems.map((item) => {
                                     const realId = getRealId(item.id);
+                                    const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
                                     return (
-                                    <TableRow key={item.id} className={item.quantity !== null && item.systemStock !== item.quantity ? 'bg-red-50' : ''}>
-                                        <TableCell className="font-mono sm:table-cell hidden">{item.id}</TableCell>
-                                        <TableCell className="font-medium">
-                                            <div className="sm:hidden"><span className="font-bold">{item.id}</span> - {item.location}</div>
-                                            {item.description}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <span className="bg-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded text-xs">{masterStock[realId]?.type || 'S/T'}</span>
-                                        </TableCell>
-                                        <TableCell className="font-mono sm:table-cell hidden">{item.location}</TableCell>
-                                        <TableCell className="text-center font-semibold text-slate-600 sm:table-cell hidden">{item.systemStock}</TableCell>
-                                        <TableCell className={`text-center font-bold ${item.quantity !== null && item.systemStock !== item.quantity ? 'text-red-600' : 'text-green-700'}`}>
-                                            <span className="sm:hidden font-normal text-slate-500">Contado: </span>{item.quantity ?? 'No contado'}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-slate-600">{item.operatorObservation || '-'}</TableCell>
-                                        <TableCell className="text-sm font-semibold text-amber-700">{item.adminComment || '-'}</TableCell>
-                                    </TableRow>
-                                )})}
+                                        <TableRow key={item.id} className={item.quantity !== null && item.systemStock !== item.quantity ? 'bg-red-50' : ''}>
+                                            <TableCell className="font-mono sm:table-cell hidden">{item.id}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <div className="sm:hidden"><span className="font-bold">{item.id}</span> - {item.location} - Tipo: {tipo}</div>
+                                                {item.description}
+                                            </TableCell>
+                                            <TableCell className="font-mono sm:table-cell hidden">{item.location}</TableCell>
+                                            <TableCell className="text-center font-bold text-slate-500 sm:table-cell hidden">{tipo}</TableCell>
+                                            <TableCell className="text-center font-semibold text-slate-600 sm:table-cell hidden">{item.systemStock}</TableCell>
+                                            <TableCell className={`text-center font-bold ${item.quantity !== null && item.systemStock !== item.quantity ? 'text-red-600' : 'text-green-700'}`}>
+                                                <span className="sm:hidden font-normal text-slate-500">Contado: </span>{item.quantity ?? 'No contado'}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-slate-600">{item.operatorObservation || '-'}</TableCell>
+                                            <TableCell className="text-sm font-semibold text-amber-700">{item.adminComment || '-'}</TableCell>
+                                        </TableRow>
+                                    )
+                                })}
                             </TableBody>
                         </Table>
                     </div>
@@ -85,9 +123,18 @@ export const AdminWeekDetailView: React.FC<{ week: WeekData; onBack: () => void;
 };
 
 const DashboardView: React.FC<{
-    onShowCreate: () => void; onSelectWeek: (week: WeekData) => void; onPrintWeek: (week: WeekData) => void;
-    onShowHistory: () => void; onShowUsers: () => void; onFinalizeWeek: (week: WeekData) => void;
-    onDeleteCount: () => void; user: User | null; onShowSettings: () => void; onShowReset: () => void; onShowMasterStock: () => void;
+    // ... todo igual a tu archivo actual ...
+    onShowCreate: () => void;
+    onSelectWeek: (week: WeekData) => void;
+    onPrintWeek: (week: WeekData) => void;
+    onShowHistory: () => void;
+    onShowUsers: () => void;
+    onFinalizeWeek: (week: WeekData) => void;
+    onDeleteCount: () => void;
+    user: User | null;
+    onShowSettings: () => void;
+    onShowReset: () => void;
+    onShowMasterStock: () => void;
 }> = ({ onShowCreate, onSelectWeek, onPrintWeek, onShowHistory, onShowUsers, onFinalizeWeek, onDeleteCount, user, onShowSettings, onShowReset, onShowMasterStock }) => {
     const { weeksData, refreshData, users, updateWeekComment, masterStock } = useAppContext();
     const finalizedWeeks = weeksData.filter(w => w.status === WeekStatus.Finalizado).length;
@@ -95,7 +142,9 @@ const DashboardView: React.FC<{
     const progressPercentage = totalWeeks > 0 ? Math.round((finalizedWeeks / totalWeeks) * 100) : 0;
     
     const today = new Date().toISOString().split('T')[0];
-    const itemsCountedToday = weeksData.flatMap(w => w.items).filter(item => item.countedDate && item.countedDate.startsWith(today) && item.quantity !== null && item.quantity > 0).length;
+    const itemsCountedToday = weeksData
+      .flatMap(w => w.items)
+      .filter(item => item.countedDate && item.countedDate.startsWith(today) && item.quantity !== null && item.quantity > 0).length;
 
     const handleExportExcel = (week: WeekData) => {
       const data = week.items.map(item => {
@@ -114,6 +163,7 @@ const DashboardView: React.FC<{
               'Contado Por': item.countedBy || ''
           };
       });
+      
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Conteo');
@@ -125,24 +175,37 @@ const DashboardView: React.FC<{
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <h2 className="text-3xl font-bold text-slate-800">Dashboard de Administrador</h2>
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
-                <Button onClick={onShowMasterStock} variant="outline" className="border-indigo-600 text-indigo-700 hover:bg-indigo-50 font-bold">Stock Maestro</Button>
-                <Button onClick={onShowHistory} variant="secondary">Historial</Button>
-                <Button onClick={onShowUsers} variant="secondary">Usuarios</Button>
-                <Button onClick={onShowSettings} variant="outline">Config.</Button>
-                <Button onClick={onShowCreate} className="bg-corporate-blue text-white">Nuevo Conteo</Button>
-                {user?.username === 'Admin' && <Button onClick={onShowReset} variant="destructive">Reiniciar</Button>}
-                {user?.username === 'Admin' && weeksData.length > 0 && <Button onClick={onDeleteCount} variant="destructive">Eliminar Conteo</Button>}
-                <Button onClick={refreshData} variant="outline" size="icon"><RefreshCw className="h-4 w-4" /></Button>
+                <Button onClick={onShowMasterStock} variant="outline" className="border-indigo-600 text-indigo-700 hover:bg-indigo-50 font-bold">Cargar Stock Maestro</Button>
+                <Button onClick={onShowHistory} variant="secondary">Ver Historial de Conteos</Button>
+                <Button onClick={onShowUsers} variant="secondary">Gestionar Usuarios</Button>
+                <Button onClick={onShowSettings} variant="outline">Configuración</Button>
+                <Button onClick={onShowCreate} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Crear Nuevo Conteo</Button>
+                {user?.username === 'Admin' && (
+                  <Button onClick={onShowReset} variant="destructive">Reiniciar Datos</Button>
+                )}
+                {user?.username === 'Admin' && weeksData.length > 0 && (
+                  <Button onClick={onDeleteCount} variant="destructive">Eliminar Conteo</Button>
+                )}
+                <Button onClick={refreshData} variant="outline" size="icon">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
             {weeksData.length === 0 ? (
               <Card className="text-center py-12">
-                <CardHeader><CardTitle>No hay un conteo activo</CardTitle></CardHeader>
-                <CardContent><Button onClick={onShowCreate} className="bg-corporate-blue text-white">Crear Nuevo Conteo</Button></CardContent>
+                <CardHeader>
+                  <CardTitle>No hay un conteo activo</CardTitle>
+                  <CardDescription>Cree un nuevo ciclo de conteo para comenzar a trabajar.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={onShowCreate} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Crear Nuevo Conteo</Button>
+                </CardContent>
               </Card>
             ) : (
-              <div className="mb-8"><DashboardIndicators weeksData={weeksData} /></div>
+              <div className="mb-8">
+                <DashboardIndicators weeksData={weeksData} />
+              </div>
             )}
             
             {weeksData.length > 0 && (
@@ -155,7 +218,9 @@ const DashboardView: React.FC<{
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{progressPercentage}%</div>
-                      <div className="w-full bg-slate-200 rounded-full h-2.5 mt-4"><div className="bg-green-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div></div>
+                      <div className="w-full bg-slate-200 rounded-full h-2.5 mt-4">
+                        <div className="bg-green-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+                      </div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -163,21 +228,27 @@ const DashboardView: React.FC<{
                       <CardTitle className="text-sm font-medium">Ítems Contados Hoy</CardTitle>
                       <Activity className="h-4 w-4 text-slate-500" />
                     </CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{itemsCountedToday}</div></CardContent>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{itemsCountedToday}</div>
+                    </CardContent>
                   </Card>
                 </div>
 
-                <div className="mb-8"><OperatorChart weeksData={weeksData} users={users} /></div>
+                <div className="mb-8">
+                  <OperatorChart weeksData={weeksData} users={users} />
+                </div>
           
                 <Card>
-                  <CardHeader><CardTitle>Estado de Semanas (Conteo Actual)</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle>Estado de Semanas (Conteo Actual)</CardTitle>
+                  </CardHeader>
                   <CardContent className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Semana</TableHead>
                           <TableHead>Estado</TableHead>
-                          <TableHead className="min-w-[400px]">INDICADORES SEMANALES</TableHead>
+                          <TableHead className="min-w-[390px]">INDICADORES SEMANALES</TableHead>
                           <TableHead className="text-center">Descargas</TableHead>
                           <TableHead>Comentario de Admin</TableHead>
                           <TableHead className="text-right">Finalizar</TableHead>
@@ -207,6 +278,7 @@ const DashboardView: React.FC<{
                             <TableRow key={week.id}>
                               <TableCell className="font-medium cursor-pointer hover:underline text-corporate-blue" onClick={() => week.status !== WeekStatus.Bloqueado && onSelectWeek(week)}>{week.name}</TableCell>
                               <TableCell>{getStatusBadge(week.status)}</TableCell>
+                              
                               <TableCell className="p-2">
                                 <div className="flex gap-2 justify-start w-full">
                                   <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px] flex flex-col justify-center">
@@ -214,7 +286,7 @@ const DashboardView: React.FC<{
                                     <div className="text-xl font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
                                     <p className="text-[10px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
                                   </div>
-                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[250px]">
+                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[240px]">
                                     <div className="flex flex-col justify-center">
                                       <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">DESVÍOS</p>
                                       <div className="text-xl font-bold text-red-600 leading-none">{weekDevPct}%</div>
@@ -231,18 +303,26 @@ const DashboardView: React.FC<{
                                   </div>
                                 </div>
                               </TableCell>
+
                               <TableCell className="text-center">
                                   <div className="flex justify-center gap-2">
                                     <Button variant="outline" size="sm" onClick={() => onPrintWeek(week)} title="Imprimir PDF"><Printer className="h-4 w-4" /></Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleExportExcel(week)} className="text-green-700 border-green-200 hover:bg-green-50">Excel</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleExportExcel(week)} className="text-green-700 border-green-200 hover:bg-green-50" title="Descargar Excel">Excel</Button>
                                   </div>
                               </TableCell>
+                              
                               <TableCell>
-                                 <Input defaultValue={week.adminComment || ''} placeholder="Nota admin..." onBlur={(e) => updateWeekComment(week.id, e.target.value)} className="min-w-[180px] bg-slate-50 text-sm" />
+                                 <Input 
+                                    defaultValue={week.adminComment || ''}
+                                    placeholder="Escriba una nota y presione Enter o haga clic fuera..."
+                                    onBlur={(e) => updateWeekComment(week.id, e.target.value)}
+                                    className="min-w-[220px] bg-slate-50 text-sm"
+                                 />
                               </TableCell>
+
                               <TableCell className="text-right">
                                   {(week.status === WeekStatus.EnProgreso || week.status === WeekStatus.Pendiente) && (
-                                      <Button size="sm" onClick={() => onFinalizeWeek(week)} className="bg-corporate-blue text-white">Finalizar Semana</Button>
+                                      <Button size="sm" onClick={() => onFinalizeWeek(week)} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Finalizar Semana</Button>
                                   )}
                               </TableCell>
                             </TableRow>
@@ -263,10 +343,10 @@ const DashboardAdmin: React.FC = () => {
     const[isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const[showResetDataModal, setShowResetDataModal] = useState(false);
     const[deleteConfirmationText, setDeleteConfirmationText] = useState('');
-    const[isModalOpen, setIsModalOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const[weekToFinalize, setWeekToFinalize] = useState<WeekData | null>(null);
     const [observation, setObservation] = useState('');
-    const[view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings' | 'masterStock'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings' | 'masterStock'>('dashboard');
     const[selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
 
     const handleSelectWeek = (week: WeekData) => { setSelectedWeek(week); setView('detail'); };
@@ -274,6 +354,7 @@ const DashboardAdmin: React.FC = () => {
     const handleBackToDashboard = () => { setSelectedWeek(null); setView('dashboard'); };
     const openFinalizeModal = (week: WeekData) => { setWeekToFinalize(week); setIsModalOpen(true); };
     const handleDeleteCount = () => { deleteCurrentCount(); setIsDeleteModalOpen(false); setDeleteConfirmationText(''); };
+
     const confirmFinalizeWeek = () => {
         if (weekToFinalize) {
             const today = new Date().toISOString().split('T')[0];
@@ -282,7 +363,9 @@ const DashboardAdmin: React.FC = () => {
                 return;
             }
             finalizeWeek(weekToFinalize.id, observation);
-            setIsModalOpen(false); setWeekToFinalize(null); setObservation('');
+            setIsModalOpen(false);
+            setWeekToFinalize(null);
+            setObservation('');
         }
     };
 
@@ -299,25 +382,28 @@ const DashboardAdmin: React.FC = () => {
             return (
                 <>
                     <DashboardView 
-                        onShowCreate={() => setView('create')} onSelectWeek={handleSelectWeek} onPrintWeek={handlePrintWeek} 
-                        onShowHistory={() => setView('history')} onShowUsers={() => setView('users')} onShowSettings={() => setView('settings')}
-                        onShowMasterStock={() => setView('masterStock')} onFinalizeWeek={openFinalizeModal} onDeleteCount={() => setIsDeleteModalOpen(true)}
-                        user={user} onShowReset={() => setShowResetDataModal(true)}
+                        onShowCreate={() => setView('create')} 
+                        onSelectWeek={handleSelectWeek} 
+                        onPrintWeek={handlePrintWeek} 
+                        onShowHistory={() => setView('history')}
+                        onShowUsers={() => setView('users')}
+                        onShowSettings={() => setView('settings')}
+                        onShowMasterStock={() => setView('masterStock')}
+                        onFinalizeWeek={openFinalizeModal}
+                        onDeleteCount={() => setIsDeleteModalOpen(true)}
+                        user={user}
+                        onShowReset={() => setShowResetDataModal(true)}
                     />
                     <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onConfirm={confirmFinalizeWeek} title={`Finalizar ${weekToFinalize?.name}`}>
                         <p>¿Está seguro de que desea finalizar esta semana?</p>
                         {weekToFinalize?.endDate && new Date().toISOString().split('T')[0] > weekToFinalize.endDate && (
-                            <div className="mt-4">
-                                <label className="block text-sm font-medium text-slate-700">Observación por Cierre Atrasado</label>
-                                <textarea value={observation} onChange={(e) => setObservation(e.target.value)} className="w-full p-2 border rounded-md mt-1" placeholder="Ingrese el motivo..." />
-                            </div>
+                            <div className="mt-4"><label className="block text-sm font-medium text-slate-700">Observación por Cierre Atrasado</label><textarea value={observation} onChange={(e) => setObservation(e.target.value)} className="w-full p-2 border rounded-md mt-1" placeholder="Ingrese el motivo del cierre fuera de término..." /></div>
                         )}
-                        <p className="font-semibold text-red-600 mt-2">Esta acción no se puede deshacer.</p>
                     </Modal>
-                    {showResetDataModal && <AlertDialog isOpen={true} onClose={() => setShowResetDataModal(false)} onConfirm={() => { resetApplicationData(); setShowResetDataModal(false); }} title="¿Reiniciar Todos los Datos?" description="Esta acción es irreversible." confirmText="Sí, Reiniciar Todo" />}
+                    {showResetDataModal && <AlertDialog isOpen={true} onClose={() => setShowResetDataModal(false)} onConfirm={() => { resetApplicationData(); setShowResetDataModal(false); }} title="¿Reiniciar Todos los Datos?" description="Esta acción borrará todos los conteos, usuarios y configuraciones." confirmText="Sí, Reiniciar Todo" />}
                     <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteCount} title="Eliminar Conteo Actual" confirmDisabled={deleteConfirmationText !== `eliminar ${weeksData.length > 0 ? weeksData[0].name.split(' ')[0] : ''}`}>
                         <p className="font-semibold text-red-600">¡Atención! Esta acción es irreversible.</p>
-                        <p className="mt-2">Para confirmar, escriba exactamente <span className="font-bold">eliminar {weeksData.length > 0 ? weeksData[0].name.split(' ')[0] : ''}</span> abajo.</p>
+                        <p className="mt-2">Escriba exactamente <span className="font-bold">eliminar {weeksData.length > 0 ? weeksData[0].name.split(' ')[0] : ''}</span> abajo.</p>
                         <Input type="text" value={deleteConfirmationText} onChange={(e) => setDeleteConfirmationText(e.target.value)} className="mt-4 w-full" />
                     </Modal>
                 </>

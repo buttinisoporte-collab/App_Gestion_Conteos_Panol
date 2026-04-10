@@ -17,15 +17,12 @@ interface ConteoTableProps { week: WeekData; onBack: () => void; onPrint: (week:
 const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
   const { user, updateWeekItems, weeksData, finalizeWeek, masterStock } = useAppContext();
   const currentWeekData = weeksData.find(w => w.id === week.id) || week;
-  const[editedItems, setEditedItems] = useState<Item[]>(() => JSON.parse(JSON.stringify(currentWeekData.items)));
-  const[isFinalized, setIsFinalized] = useState(currentWeekData.status === 'Finalizado');
+  const [editedItems, setEditedItems] = useState<Item[]>(() => JSON.parse(JSON.stringify(currentWeekData.items)));
+  const [isFinalized, setIsFinalized] = useState(currentWeekData.status === 'Finalizado');
   const [view, setView] = useState<'table' | 'report' | 'modify'>('table');
-  const[showSaveModal, setShowSaveModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const[showFinalizeModal, setShowFinalizeModal] = useState(false);
-  
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('ALL'); // NUEVO: Filtro por tipo
-  
   const[itemOrder, setItemOrder] = useState<string[]>([]);
   const[hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -35,14 +32,16 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
   }, [weeksData, week.id]);
 
   useEffect(() => {
-    const initialSortedIds =[...currentWeekData.items].sort((a, b) => {
-        const aCounted = a.quantity !== null;
-        const bCounted = b.quantity !== null;
-        if (aCounted === bCounted) return 0;
-        return aCounted ? 1 : -1;
-    }).map(item => item.id);
+    const initialSortedIds = [...currentWeekData.items]
+        .sort((a, b) => {
+            const aCounted = a.quantity !== null;
+            const bCounted = b.quantity !== null;
+            if (aCounted === bCounted) return 0;
+            return aCounted ? 1 : -1;
+        })
+        .map(item => item.id);
     setItemOrder(initialSortedIds);
-  },[week.id]);
+  }, [week.id]);
 
   useEffect(() => {
     if (!hasUnsavedChanges || isFinalized) return;
@@ -68,25 +67,15 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
   const handleSave = () => { updateWeekItems(week.id, editedItems); setHasUnsavedChanges(false); setShowSaveModal(true); setTimeout(() => { setShowSaveModal(false); onBack(); }, 1500); };
   const handleFinalize = () => setShowFinalizeModal(true);
   const confirmFinalize = async () => { if (hasUnsavedChanges) { await updateWeekItems(week.id, editedItems); setHasUnsavedChanges(false); } finalizeWeek(week.id); setIsFinalized(true); setShowFinalizeModal(false); };
-
+  
   const canEdit = user?.role === 'admin' || !isFinalized;
 
   const sortedAndFilteredItems = useMemo(() => {
-    const itemsById = new Map(editedItems.map(item => [item.id, item]));
+    const itemsById = new Map(editedItems.map(item =>[item.id, item]));
     const orderedItems = itemOrder.map(id => itemsById.get(id)).filter(Boolean) as Item[];
-    
-    return orderedItems.filter(item => {
-        // Filtro de búsqueda
-        const matchesSearch = !searchTerm || item.id.toLowerCase().includes(searchTerm.toLowerCase()) || item.description.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        // Filtro de TIPO
-        const realId = getRealId(item.id);
-        const itemType = masterStock[realId]?.type?.toUpperCase() || 'S/T';
-        const matchesType = typeFilter === 'ALL' || itemType === typeFilter;
-
-        return matchesSearch && matchesType;
-    });
-  },[editedItems, searchTerm, itemOrder, typeFilter, masterStock]);
+    if (!searchTerm) return orderedItems;
+    return orderedItems.filter(item => item.id.toLowerCase().includes(searchTerm.toLowerCase()) || item.description.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [editedItems, searchTerm, itemOrder]);
 
   return (
     <>
@@ -101,34 +90,17 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
               <p className="text-slate-600">{isFinalized && user?.role !== 'admin' ? 'Este conteo ha sido finalizado.' : 'Complete los datos y guarde su avance.'}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Button onClick={() => setView('report')} variant="secondary">Ver Reporte</Button>
+              <Button onClick={() => setView('report')} variant="secondary">Ver Reporte Semanal</Button>
               <Button onClick={() => onPrint({ ...week, items: editedItems })} variant="secondary">Descargar Planilla</Button>
               {!isFinalized && <Button onClick={handleSave} className="bg-corporate-blue text-white">Guardar Avance {hasUnsavedChanges && "*"}</Button>}
-              {!isFinalized && user?.role === 'admin' && <Button onClick={() => setShowFinalizeModal(true)} variant="destructive">Finalizar Semana</Button>}
             </div>
           </div>
 
           {showSaveModal && <Modal isOpen={true} onClose={() => { setShowSaveModal(false); onBack(); }} onConfirm={() => { setShowSaveModal(false); onBack(); }} title="Progreso Guardado"><p>Su avance ha sido guardado.</p></Modal>}
           {showFinalizeModal && <AlertDialog isOpen={true} onClose={() => setShowFinalizeModal(false)} onConfirm={confirmFinalize} title="¿Finalizar Semana?" description="Esta acción no se puede deshacer." confirmText="Sí, Finalizar" />}
 
-          {/* BARRA DE FILTROS */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
-            <Input placeholder="Buscar por ID o Descripción..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-80" />
-            <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-600 whitespace-nowrap">Filtrar por Tipo:</label>
-                <select 
-                    value={typeFilter} 
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                    className="border border-slate-300 rounded-md p-2 text-sm bg-white"
-                >
-                    <option value="ALL">Todos los tipos</option>
-                    <option value="A">Tipo A</option>
-                    <option value="B">Tipo B</option>
-                    <option value="C">Tipo C</option>
-                    <option value="S/T">Sin Tipo (S/T)</option>
-                </select>
-            </div>
-            <span className="text-sm text-slate-500 ml-auto hidden md:block">Los ítems contados van al final de la lista.</span>
+          <div className="flex items-center mb-4">
+            <Input placeholder="Buscar por ID o Descripción..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-xs" />
           </div>
           
           <div className="bg-white rounded-lg shadow-md border overflow-hidden flex flex-col h-[calc(100vh-230px)]">
@@ -136,35 +108,53 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
               <Table className="relative w-full">
                 <TableHeader className="sticky top-0 bg-slate-100 z-20 shadow-sm outline outline-1 outline-slate-200">
                   <TableRow>
-                    <TableHead>ID Material</TableHead>
+                    <TableHead className="hidden md:table-cell">ID Material</TableHead>
                     <TableHead>Descripción</TableHead>
-                    <TableHead className="text-center">Tipo</TableHead>
-                    <TableHead>Ubicación</TableHead>
+                    <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
+                    <TableHead className="hidden sm:table-cell text-center">Tipo</TableHead>
                     <TableHead className="text-center">Stock Sistema</TableHead>
                     <TableHead className="text-center">Cantidad Contada</TableHead>
                     <TableHead className="text-center">Diferencia</TableHead>
                     <TableHead>Observación Operario</TableHead>
+                    {user?.role === 'admin' && <TableHead>Comentario Admin</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedAndFilteredItems.map((item) => {
                     const realId = getRealId(item.id);
+                    const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
+
                     return (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono">{item.id}</TableCell>
-                      <TableCell className="font-medium">{item.description}</TableCell>
-                      <TableCell className="text-center">
-                        <span className="bg-slate-200 text-slate-800 font-bold px-2 py-1 rounded text-xs">
-                          {masterStock[realId]?.type || 'S/T'}
-                        </span>
-                      </TableCell>
-                      <TableCell><Input type="text" value={item.location} onChange={(e) => handleItemChange(item.id, 'location', e.target.value)} disabled={!canEdit} className="w-32 font-mono" /></TableCell>
-                      <TableCell className="text-center"><Input type="number" value={item.systemStock} onChange={(e) => handleItemChange(item.id, 'systemStock', e.target.valueAsNumber || 0)} disabled={!canEdit} className="w-24 text-center font-bold mx-auto bg-slate-50" min="0" /></TableCell>
-                      <TableCell className="text-center"><Input type="number" value={item.quantity === null ? '' : item.quantity} onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value === '' ? null : e.target.valueAsNumber)} disabled={!canEdit} className="w-24 text-center text-lg font-bold mx-auto" min="0" /></TableCell>
-                      <TableCell className="text-center">{item.quantity !== null && item.systemStock !== item.quantity && <Check className="h-6 w-6 text-red-600 mx-auto" />}</TableCell>
-                      <TableCell><Input type="text" placeholder="Observación..." value={item.operatorObservation || ''} onChange={(e) => handleItemChange(item.id, 'operatorObservation', e.target.value)} disabled={!canEdit} className="min-w-[150px]" /></TableCell>
-                    </TableRow>
-                  )})}
+                      <TableRow key={item.id}>
+                        <TableCell className="hidden md:table-cell font-mono">{item.id}</TableCell>
+                        <TableCell className="font-medium">{item.description}</TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Input type="text" value={item.location} onChange={(e) => handleItemChange(item.id, 'location', e.target.value)} disabled={!canEdit} className="w-32 font-mono" />
+                        </TableCell>
+                        
+                        {/* NUEVA CELDA: TIPO */}
+                        <TableCell className="hidden sm:table-cell text-center font-bold text-slate-500">{tipo}</TableCell>
+                        
+                        <TableCell className="text-center">
+                           <Input type="number" value={item.systemStock} onChange={(e) => handleItemChange(item.id, 'systemStock', e.target.valueAsNumber || 0)} disabled={!canEdit} className="w-24 text-center font-bold mx-auto bg-slate-50" min="0" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Input type="number" value={item.quantity === null ? '' : item.quantity} onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value === '' ? null : e.target.valueAsNumber)} disabled={!canEdit} className="w-24 text-center text-lg font-bold mx-auto" min="0" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {item.quantity !== null && item.systemStock !== item.quantity && <Check className="h-6 w-6 text-red-600 mx-auto" />}
+                        </TableCell>
+                        <TableCell>
+                          <Input type="text" placeholder="Observación..." value={item.operatorObservation || ''} onChange={(e) => handleItemChange(item.id, 'operatorObservation', e.target.value)} disabled={!canEdit} className="min-w-[150px]" />
+                        </TableCell>
+                        {user?.role === 'admin' && (
+                          <TableCell>
+                            <Input type="text" placeholder="Nota admin..." value={item.adminComment || ''} onChange={(e) => handleItemChange(item.id, 'adminComment', e.target.value)} className="min-w-[150px] bg-yellow-50" />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
