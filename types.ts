@@ -111,4 +111,13 @@ export interface AppContextType {
   resetApplicationData: () => Promise<void>;
   countCycle: CountCycle | null;
   updateSettings: (newSettings: Partial<SettingsData>) => Promise<void>;
+  masterStock: Record<string, MasterStockItem>;
+  updateMasterStock: (data: Record<string, MasterStockItem>) => Promise<void>;
+}
+
+export interface MasterStockItem {
+  id: string;
+  description: string;
+  location: string;
+  type: string; // Guardará el TIPO (A, B, C)
 }

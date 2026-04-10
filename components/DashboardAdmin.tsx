@@ -16,13 +16,11 @@ import HistoryDashboard from './HistoryDashboard';
 import UserManagement from './UserManagement';
 import OperatorChart from './OperatorChart';
 import Settings from './Settings';
+import MasterStockManager from './MasterStockManager';
 
 export const getStatusBadge = (status: WeekStatus) => {
   const styles = {
-    [WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',
-    [WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',
-    [WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',
-    [WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
+    [WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',[WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',[WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',[WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
   };
   return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styles[status]}`}>{status}</span>;
 };
@@ -30,9 +28,7 @@ export const getStatusBadge = (status: WeekStatus) => {
 export const AdminWeekDetailView: React.FC<{ week: WeekData; onBack: () => void; }> = ({ week, onBack }) => {
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <Button onClick={onBack} variant="secondary" className="mb-4">
-                &larr; Volver
-            </Button>
+            <Button onClick={onBack} variant="secondary" className="mb-4">&larr; Volver</Button>
             <Card>
                 <CardHeader>
                     <CardTitle>Detalle del Conteo - {week.name}</CardTitle>
@@ -95,8 +91,9 @@ const DashboardView: React.FC<{
     user: User | null;
     onShowSettings: () => void;
     onShowReset: () => void;
-}> = ({ onShowCreate, onSelectWeek, onPrintWeek, onShowHistory, onShowUsers, onFinalizeWeek, onDeleteCount, user, onShowSettings, onShowReset }) => {
-    const { weeksData, refreshData, users, updateWeekComment } = useAppContext();
+    onShowMasterStock: () => void;
+}> = ({ onShowCreate, onSelectWeek, onPrintWeek, onShowHistory, onShowUsers, onFinalizeWeek, onDeleteCount, user, onShowSettings, onShowReset, onShowMasterStock }) => {
+    const { weeksData, refreshData, users, updateWeekComment, masterStock } = useAppContext();
     const finalizedWeeks = weeksData.filter(w => w.status === WeekStatus.Finalizado).length;
     const totalWeeks = weeksData.length;
     const progressPercentage = totalWeeks > 0 ? Math.round((finalizedWeeks / totalWeeks) * 100) : 0;
@@ -114,6 +111,7 @@ const DashboardView: React.FC<{
           'Stock Sistema': item.systemStock,
           'Cantidad Contada': item.quantity ?? 'No contado',
           'Diferencia': item.quantity !== null ? item.quantity - item.systemStock : '',
+          'Tipo de Artículo': masterStock[item.id]?.type || 'S/T',
           'Observación Operario': item.operatorObservation || '',
           'Comentario Admin': item.adminComment || '',
           'Fecha Conteo': item.countedDate ? new Date(item.countedDate).toLocaleDateString('es-AR') : '',
@@ -131,6 +129,7 @@ const DashboardView: React.FC<{
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <h2 className="text-3xl font-bold text-slate-800">Dashboard de Administrador</h2>
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                <Button onClick={onShowMasterStock} variant="outline" className="border-indigo-600 text-indigo-700 hover:bg-indigo-50 font-bold">Cargar Stock Maestro</Button>
                 <Button onClick={onShowHistory} variant="secondary">Ver Historial de Conteos</Button>
                 <Button onClick={onShowUsers} variant="secondary">Gestionar Usuarios</Button>
                 <Button onClick={onShowSettings} variant="outline">Configuración</Button>
@@ -203,7 +202,7 @@ const DashboardView: React.FC<{
                         <TableRow>
                           <TableHead>Semana</TableHead>
                           <TableHead>Estado</TableHead>
-                          <TableHead className="min-w-[280px]">INDICADORES SEMANALES</TableHead>
+                          <TableHead className="min-w-[340px]">INDICADORES SEMANALES</TableHead>
                           <TableHead className="text-center">Descargas</TableHead>
                           <TableHead>Comentario de Admin</TableHead>
                           <TableHead className="text-right">Finalizar</TableHead>
@@ -211,30 +210,46 @@ const DashboardView: React.FC<{
                       </TableHeader>
                       <TableBody>
                         {weeksData.map((week) => {
-                          // Cálculos de KPI individuales para esta semana
                           const weekTotal = week.items.length;
-                          const weekCounted = week.items.filter(i => i.quantity !== null).length;
-                          const weekDeviations = week.items.filter(i => i.quantity !== null && i.quantity !== i.systemStock).length;
+                          const weekCountedItems = week.items.filter(i => i.quantity !== null);
+                          const weekCounted = weekCountedItems.length;
+                          const weekDeviations = weekCountedItems.filter(i => i.quantity !== i.systemStock);
+                          const weekDevCount = weekDeviations.length;
                           const weekCompPct = weekTotal > 0 ? ((weekCounted / weekTotal) * 100).toFixed(2) : '0.00';
-                          const weekDevPct = weekCounted > 0 ? ((weekDeviations / weekCounted) * 100).toFixed(2) : '0.00';
+                          const weekDevPct = weekCounted > 0 ? ((weekDevCount / weekCounted) * 100).toFixed(2) : '0.00';
+
+                          const typeCounts: Record<string, number> = {};
+                          weekDeviations.forEach(i => {
+                              const tipo = masterStock[i.id]?.type?.toUpperCase() || 'S/T';
+                              typeCounts[tipo] = (typeCounts[tipo] || 0) + 1;
+                          });
+                          const breakdown = Object.entries(typeCounts)
+                              .map(([tipo, count]) => ({ tipo, pct: weekCounted > 0 ? ((count / weekCounted) * 100).toFixed(2) : '0.00' }))
+                              .sort((a,b) => a.tipo.localeCompare(b.tipo));
 
                           return (
                             <TableRow key={week.id}>
                               <TableCell className="font-medium cursor-pointer hover:underline text-corporate-blue" onClick={() => week.status !== WeekStatus.Bloqueado && onSelectWeek(week)}>{week.name}</TableCell>
                               <TableCell>{getStatusBadge(week.status)}</TableCell>
                               
-                              {/* NUEVA COLUMNA: INDICADORES SEMANALES */}
                               <TableCell className="p-2">
-                                <div className="flex gap-2 justify-start min-w-[260px]">
-                                  <div className="bg-white border border-slate-200 rounded p-2 flex-1 shadow-sm">
+                                <div className="flex gap-2 justify-start w-full">
+                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px]">
                                     <p className="text-[10px] text-slate-500 font-bold mb-1">CUMPLIMIENTO</p>
                                     <div className="text-lg font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
                                     <p className="text-[9px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
                                   </div>
-                                  <div className="bg-white border border-slate-200 rounded p-2 flex-1 shadow-sm">
-                                    <p className="text-[10px] text-slate-500 font-bold mb-1">DESVÍOS</p>
-                                    <div className="text-lg font-bold text-red-600 leading-none">{weekDevPct}%</div>
-                                    <p className="text-[9px] text-slate-400 mt-1">{weekDeviations} con dif.</p>
+                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[190px]">
+                                    <div>
+                                      <p className="text-[10px] text-slate-500 font-bold mb-1">DESVÍOS</p>
+                                      <div className="text-lg font-bold text-red-600 leading-none">{weekDevPct}%</div>
+                                      <p className="text-[9px] text-slate-400 mt-1">{weekDevCount} con dif.</p>
+                                    </div>
+                                    <div className="text-[9px] flex flex-col justify-center ml-3 pl-3 border-l border-slate-100">
+                                       {breakdown.length === 0 ? <span className="text-slate-400">-</span> : breakdown.map(b => (
+                                          <span key={b.tipo} className="font-bold text-slate-700">{b.tipo}: {b.pct}%</span>
+                                       ))}
+                                    </div>
                                   </div>
                                 </div>
                               </TableCell>
@@ -250,7 +265,6 @@ const DashboardView: React.FC<{
                                   </div>
                               </TableCell>
                               
-                              {/* COLUMNA MOVIDA: COMENTARIO ADMIN */}
                               <TableCell>
                                  <Input 
                                     defaultValue={week.adminComment || ''}
@@ -289,7 +303,7 @@ const DashboardAdmin: React.FC = () => {
     const[weekToFinalize, setWeekToFinalize] = useState<WeekData | null>(null);
     const [observation, setObservation] = useState('');
     
-    const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings' | 'masterStock'>('dashboard');
     const[selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
 
     const handleSelectWeek = (week: WeekData) => {
@@ -339,6 +353,7 @@ const DashboardAdmin: React.FC = () => {
         case 'history': return <HistoryDashboard onBack={handleBackToDashboard} />;
         case 'users': return <UserManagement onBack={handleBackToDashboard} />;
         case 'settings': return <Settings onBack={handleBackToDashboard} />;
+        case 'masterStock': return <MasterStockManager onBack={handleBackToDashboard} />;
         case 'dashboard':
         default:
             return (
@@ -350,6 +365,7 @@ const DashboardAdmin: React.FC = () => {
                         onShowHistory={() => setView('history')}
                         onShowUsers={() => setView('users')}
                         onShowSettings={() => setView('settings')}
+                        onShowMasterStock={() => setView('masterStock')}
                         onFinalizeWeek={openFinalizeModal}
                         onDeleteCount={() => setIsDeleteModalOpen(true)}
                         user={user}

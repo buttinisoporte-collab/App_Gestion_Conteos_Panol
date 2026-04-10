@@ -20,6 +20,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const[historicalCounts, setHistoricalCounts] = useState<CountCycle[]>([]);
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
+  const [masterStock, setMasterStock] = useState<Record<string, MasterStockItem>>({});
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);
@@ -34,13 +35,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dataService.getUsers(),
         dataService.getCurrentCount(),
         dataService.getHistoricalCounts() // <-- OJO: Asegúrate de tener esta función en tu dataService.ts
+        dataService.getMasterStock()
       ]);
 
-      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical] = await (Promise.race([fetchPromise, timeoutPromise]) as Promise<any>);
+      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical, fetchedTours, fetchedMasterStock] = await (Promise.race([fetchPromise, timeoutPromise]) as Promise<any>);
       
       setUsers(fetchedUsers ||[]);
       setCountCycle(fetchedCurrentCount || null);
       setHistoricalCounts(fetchedHistorical ||[]);
+      setMasterStock(fetchedMasterStock || {});
     } catch (error) {
       console.error('Error refreshing data:', error);
       setUsers([]);
@@ -270,7 +273,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-const updateWeekComment = async (weekId: string, comment: string) => {
+ const updateWeekComment = async (weekId: string, comment: string) => {
     if (!user || !countCycle) return;
     const updatedWeeks = countCycle.weeks.map(w => 
       w.id === weekId ? { ...w, adminComment: comment } : w
@@ -308,6 +311,11 @@ const updateWeekComment = async (weekId: string, comment: string) => {
     }
   };
 
+ const updateMasterStock = async (data: Record<string, MasterStockItem>) => {
+    const success = await dataService.saveMasterStock(data);
+    if (success) setMasterStock(data);
+  };
+
   return (
     <AppContext.Provider value={{ 
         user, 
@@ -332,7 +340,9 @@ const updateWeekComment = async (weekId: string, comment: string) => {
         deleteCurrentCount,
         refreshData,
         resetApplicationData,
-        countCycle
+        countCycle,
+        masterStock,
+        updateMasterStock
     }}>
       {!isLoading ? children : (
         <div className="flex items-center justify-center min-h-screen bg-slate-50">

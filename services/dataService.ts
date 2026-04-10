@@ -78,4 +78,29 @@ export const dataService = {
       return []; // Corregido: retorna un array vacío en caso de error
     }
   }, // Cierre de la función
+
+  // --- FUNCIONES PARA STOCK MAESTRO ---
+  async getMasterStock(): Promise<Record<string, MasterStockItem>> {
+    try {
+      const docRef = doc(db, 'settings', 'master_stock');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().items) {
+        return docSnap.data().items;
+      }
+      return {};
+    } catch (error) {
+      console.error('Error fetching master stock:', error);
+      return {};
+    }
+  },
+
+  async saveMasterStock(items: Record<string, MasterStockItem>): Promise<boolean> {
+    try {
+      await setDoc(doc(db, 'settings', 'master_stock'), { items });
+      return true;
+    } catch (error) {
+      console.error('Error saving master stock:', error);
+      return false;
+    }
+  }
 }; // Cierre del objeto dataService
