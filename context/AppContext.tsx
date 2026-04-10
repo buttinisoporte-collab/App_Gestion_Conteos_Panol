@@ -22,6 +22,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [masterStock, setMasterStock] = useState<Record<string, MasterStockItem>>({});
   const [masterStockDate, setMasterStockDate] = useState<string | null>(null);
+  const [tours, setTours] = useState<Tour[]>([]);
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);
