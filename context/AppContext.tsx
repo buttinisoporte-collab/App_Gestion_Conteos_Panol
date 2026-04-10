@@ -21,6 +21,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [masterStock, setMasterStock] = useState<Record<string, MasterStockItem>>({});
+  const [masterStockDate, setMasterStockDate] = useState<string | null>(null);
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);
@@ -38,12 +39,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dataService.getMasterStock()
       ]);
 
-      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical, fetchedTours, fetchedMasterStock] = await (Promise.race([fetchPromise, timeoutPromise]) as Promise<any>);
+      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical, fetchedTours, fetchedMasterStockData] = await (Promise.race([fetchPromise, timeoutPromise]) as Promise<any>);
       
-      setUsers(fetchedUsers ||[]);
+      setUsers(fetchedUsers || []);
       setCountCycle(fetchedCurrentCount || null);
       setHistoricalCounts(fetchedHistorical ||[]);
-      setMasterStock(fetchedMasterStock || {});
+      setTours(fetchedTours ||[]);
+      setMasterStock(fetchedMasterStockData?.items || {});
+      setMasterStockDate(fetchedMasterStockData?.lastUpdated || null);
     } catch (error) {
       console.error('Error refreshing data:', error);
       setUsers([]);
@@ -311,9 +314,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
- const updateMasterStock = async (data: Record<string, MasterStockItem>) => {
-    const success = await dataService.saveMasterStock(data);
-    if (success) setMasterStock(data);
+  const updateMasterStock = async (data: Record<string, MasterStockItem>) => {
+    const now = new Date().toISOString();
+    const success = await dataService.saveMasterStock(data, now);
+    if (success) {
+      setMasterStock(data);
+      setMasterStockDate(now);
+    }
   };
 
   return (

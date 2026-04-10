@@ -80,23 +80,23 @@ export const dataService = {
   }, // Cierre de la función
 
   // --- FUNCIONES PARA STOCK MAESTRO ---
-  async getMasterStock(): Promise<Record<string, MasterStockItem>> {
+  async getMasterStock(): Promise<{items: Record<string, MasterStockItem>, lastUpdated?: string}> {
     try {
       const docRef = doc(db, 'settings', 'master_stock');
       const docSnap = await getDoc(docRef);
       if (docSnap.exists() && docSnap.data().items) {
-        return docSnap.data().items;
+        return { items: docSnap.data().items, lastUpdated: docSnap.data().lastUpdated };
       }
-      return {};
+      return { items: {} };
     } catch (error) {
       console.error('Error fetching master stock:', error);
-      return {};
+      return { items: {} };
     }
-  },
+   },
 
-  async saveMasterStock(items: Record<string, MasterStockItem>): Promise<boolean> {
+   async saveMasterStock(items: Record<string, MasterStockItem>, lastUpdated: string): Promise<boolean> {
     try {
-      await setDoc(doc(db, 'settings', 'master_stock'), { items });
+      await setDoc(doc(db, 'settings', 'master_stock'), { items, lastUpdated });
       return true;
     } catch (error) {
       console.error('Error saving master stock:', error);
