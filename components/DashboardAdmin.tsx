@@ -18,12 +18,10 @@ import OperatorChart from './OperatorChart';
 import Settings from './Settings';
 import MasterStockManager from './MasterStockManager';
 
-// NUEVO: Función auxiliar para limpiar el prefijo de la semana
 const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
 
 export const getStatusBadge = (status: WeekStatus) => {
-  const styles = {
-    [WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',[WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',[WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',[WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
+  const styles = {[WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',[WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',[WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',[WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
   };
   return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styles[status]}`}>{status}</span>;
 };
@@ -108,7 +106,7 @@ const DashboardView: React.FC<{
 
     const handleExportExcel = (week: WeekData) => {
       const data = week.items.map(item => {
-          const realId = getRealId(item.id); // Usamos el ID limpio para exportar Excel
+          const realId = getRealId(item.id);
           return {
               'ID Material': item.id,
               'Descripción': item.description,
@@ -208,7 +206,8 @@ const DashboardView: React.FC<{
                         <TableRow>
                           <TableHead>Semana</TableHead>
                           <TableHead>Estado</TableHead>
-                          <TableHead className="min-w-[340px]">INDICADORES SEMANALES</TableHead>
+                          {/* SE AUMENTÓ EL ANCHO DE LA COLUMNA DE INDICADORES */}
+                          <TableHead className="min-w-[390px]">INDICADORES SEMANALES</TableHead>
                           <TableHead className="text-center">Descargas</TableHead>
                           <TableHead>Comentario de Admin</TableHead>
                           <TableHead className="text-right">Finalizar</TableHead>
@@ -226,7 +225,7 @@ const DashboardView: React.FC<{
 
                           const typeCounts: Record<string, number> = {};
                           weekDeviations.forEach(i => {
-                              const realId = getRealId(i.id); // Usamos el ID limpio
+                              const realId = getRealId(i.id);
                               const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
                               typeCounts[tipo] = (typeCounts[tipo] || 0) + 1;
                           });
@@ -241,20 +240,23 @@ const DashboardView: React.FC<{
                               
                               <TableCell className="p-2">
                                 <div className="flex gap-2 justify-start w-full">
-                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px]">
-                                    <p className="text-[10px] text-slate-500 font-bold mb-1">CUMPLIMIENTO</p>
-                                    <div className="text-lg font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
-                                    <p className="text-[9px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
+                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px] flex flex-col justify-center">
+                                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">CUMPLIMIENTO</p>
+                                    <div className="text-xl font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
+                                    <p className="text-[10px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
                                   </div>
-                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[190px]">
-                                    <div>
-                                      <p className="text-[10px] text-slate-500 font-bold mb-1">DESVÍOS</p>
-                                      <div className="text-lg font-bold text-red-600 leading-none">{weekDevPct}%</div>
-                                      <p className="text-[9px] text-slate-400 mt-1">{weekDevCount} con dif.</p>
+                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[240px]">
+                                    <div className="flex flex-col justify-center">
+                                      <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">DESVÍOS</p>
+                                      <div className="text-xl font-bold text-red-600 leading-none">{weekDevPct}%</div>
+                                      <p className="text-[10px] text-slate-400 mt-1">{weekDevCount} con dif.</p>
                                     </div>
-                                    <div className="text-[9px] flex flex-col justify-center ml-3 pl-3 border-l border-slate-100">
-                                       {breakdown.length === 0 ? <span className="text-slate-400">-</span> : breakdown.map(b => (
-                                          <span key={b.tipo} className="font-bold text-slate-700">{b.tipo}: {b.pct}%</span>
+                                    <div className="flex flex-col justify-center ml-3 pl-3 border-l border-slate-200 gap-1.5">
+                                       {breakdown.length === 0 ? <span className="text-xs text-slate-400">-</span> : breakdown.map(b => (
+                                          <div key={b.tipo} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                                              <span className="bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] min-w-[24px] text-center">{b.tipo}</span>
+                                              <span>{b.pct}%</span>
+                                          </div>
                                        ))}
                                     </div>
                                   </div>
@@ -306,9 +308,9 @@ const DashboardAdmin: React.FC = () => {
     const[isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const[showResetDataModal, setShowResetDataModal] = useState(false);
     const[deleteConfirmationText, setDeleteConfirmationText] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const[isModalOpen, setIsModalOpen] = useState(false);
     const[weekToFinalize, setWeekToFinalize] = useState<WeekData | null>(null);
-    const[observation, setObservation] = useState('');
+    const [observation, setObservation] = useState('');
     
     const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings' | 'masterStock'>('dashboard');
     const[selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);

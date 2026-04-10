@@ -6,7 +6,6 @@ import { useAppContext } from '../context/AppContext';
 export default function DashboardIndicators({ weeksData }: { weeksData: WeekData[] }) {
   const { masterStock } = useAppContext();
 
-  // NUEVO: Función para quitar el prefijo S1-, S2- y obtener el ID real
   const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
 
   const calculateMetrics = (items: any[]) => {
@@ -21,7 +20,6 @@ export default function DashboardIndicators({ weeksData }: { weeksData: WeekData
 
       const typeCounts: Record<string, number> = {};
       deviations.forEach((i: any) => {
-          // Buscamos usando el ID real sin el prefijo
           const realId = getRealId(i.id);
           const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
           typeCounts[tipo] = (typeCounts[tipo] || 0) + 1;
@@ -38,12 +36,24 @@ export default function DashboardIndicators({ weeksData }: { weeksData: WeekData
   const currentMetrics = calculateMetrics(currentWeek?.items ||[]);
   const generalMetrics = calculateMetrics(weeksData.flatMap(w => w.items));
 
+  // DISEÑO MEJORADO: Letras más grandes y etiquetas para los tipos
   const renderBreakdown = (breakdown: any[]) => (
-     <div className="flex flex-col text-xs text-slate-800 font-bold ml-4 border-l pl-4 border-slate-200">
-         <span className="text-[9px] uppercase text-slate-900 mb-1">Apertura x Tipo Artículos</span>
-         {breakdown.length === 0 ? <span className="font-normal text-slate-400">Sin desvíos</span> : breakdown.map(b => (
-             <span key={b.tipo}>{b.tipo} = {b.pct}%</span>
-         ))}
+     <div className="flex flex-col ml-4 border-l pl-4 border-slate-200 justify-center min-w-[120px]">
+         <span className="text-[10px] uppercase text-slate-500 font-bold mb-2 tracking-wider">Apertura x Tipo</span>
+         {breakdown.length === 0 ? (
+             <span className="text-sm font-normal text-slate-400">Sin desvíos</span>
+         ) : (
+             <div className="flex flex-col gap-1.5">
+                 {breakdown.map(b => (
+                     <div key={b.tipo} className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                         <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-xs min-w-[28px] text-center">
+                             {b.tipo}
+                         </span>
+                         <span>{b.pct}%</span>
+                     </div>
+                 ))}
+             </div>
+         )}
      </div>
   );
 
@@ -59,7 +69,7 @@ export default function DashboardIndicators({ weeksData }: { weeksData: WeekData
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Desvíos (Semana Actual)</CardTitle></CardHeader>
         <CardContent className="flex justify-between items-center">
-          <div>
+          <div className="flex-1">
               <div className="text-3xl font-bold text-red-600">{currentMetrics.devPct}%</div>
               <p className="text-xs text-slate-500">{currentMetrics.devCount} ítems con diferencias.</p>
           </div>
@@ -76,7 +86,7 @@ export default function DashboardIndicators({ weeksData }: { weeksData: WeekData
       <Card className="bg-slate-50 border-red-200">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Desvíos (Conteo General)</CardTitle></CardHeader>
         <CardContent className="flex justify-between items-center">
-          <div>
+          <div className="flex-1">
               <div className="text-3xl font-bold text-red-600">{generalMetrics.devPct}%</div>
               <p className="text-xs text-slate-500">{generalMetrics.devCount} ítems con diferencias en total.</p>
           </div>
