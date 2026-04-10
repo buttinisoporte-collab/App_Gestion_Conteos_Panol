@@ -6,6 +6,9 @@ import { useAppContext } from '../context/AppContext';
 export default function DashboardIndicators({ weeksData }: { weeksData: WeekData[] }) {
   const { masterStock } = useAppContext();
 
+  // NUEVO: Función para quitar el prefijo S1-, S2- y obtener el ID real
+  const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
+
   const calculateMetrics = (items: any[]) => {
       const total = items.length;
       const countedItems = items.filter((i: any) => i.quantity !== null);
@@ -18,7 +21,9 @@ export default function DashboardIndicators({ weeksData }: { weeksData: WeekData
 
       const typeCounts: Record<string, number> = {};
       deviations.forEach((i: any) => {
-          const tipo = masterStock[i.id]?.type?.toUpperCase() || 'S/T';
+          // Buscamos usando el ID real sin el prefijo
+          const realId = getRealId(i.id);
+          const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
           typeCounts[tipo] = (typeCounts[tipo] || 0) + 1;
       });
 

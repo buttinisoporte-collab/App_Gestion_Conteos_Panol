@@ -18,6 +18,9 @@ import OperatorChart from './OperatorChart';
 import Settings from './Settings';
 import MasterStockManager from './MasterStockManager';
 
+// NUEVO: Función auxiliar para limpiar el prefijo de la semana
+const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
+
 export const getStatusBadge = (status: WeekStatus) => {
   const styles = {
     [WeekStatus.Bloqueado]: 'bg-slate-200 text-slate-700',[WeekStatus.Pendiente]: 'bg-yellow-200 text-yellow-800',[WeekStatus.EnProgreso]: 'bg-blue-200 text-blue-800',[WeekStatus.Finalizado]: 'bg-green-200 text-green-800',
@@ -104,19 +107,22 @@ const DashboardView: React.FC<{
       .filter(item => item.countedDate && item.countedDate.startsWith(today) && item.quantity !== null && item.quantity > 0).length;
 
     const handleExportExcel = (week: WeekData) => {
-      const data = week.items.map(item => ({
-          'ID Material': item.id,
-          'Descripción': item.description,
-          'Ubicación': item.location,
-          'Stock Sistema': item.systemStock,
-          'Cantidad Contada': item.quantity ?? 'No contado',
-          'Diferencia': item.quantity !== null ? item.quantity - item.systemStock : '',
-          'Tipo de Artículo': masterStock[item.id]?.type || 'S/T',
-          'Observación Operario': item.operatorObservation || '',
-          'Comentario Admin': item.adminComment || '',
-          'Fecha Conteo': item.countedDate ? new Date(item.countedDate).toLocaleDateString('es-AR') : '',
-          'Contado Por': item.countedBy || ''
-      }));
+      const data = week.items.map(item => {
+          const realId = getRealId(item.id); // Usamos el ID limpio para exportar Excel
+          return {
+              'ID Material': item.id,
+              'Descripción': item.description,
+              'Ubicación': item.location,
+              'Stock Sistema': item.systemStock,
+              'Cantidad Contada': item.quantity ?? 'No contado',
+              'Diferencia': item.quantity !== null ? item.quantity - item.systemStock : '',
+              'Tipo de Artículo': masterStock[realId]?.type || 'S/T',
+              'Observación Operario': item.operatorObservation || '',
+              'Comentario Admin': item.adminComment || '',
+              'Fecha Conteo': item.countedDate ? new Date(item.countedDate).toLocaleDateString('es-AR') : '',
+              'Contado Por': item.countedBy || ''
+          };
+      });
       
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
@@ -220,7 +226,8 @@ const DashboardView: React.FC<{
 
                           const typeCounts: Record<string, number> = {};
                           weekDeviations.forEach(i => {
-                              const tipo = masterStock[i.id]?.type?.toUpperCase() || 'S/T';
+                              const realId = getRealId(i.id); // Usamos el ID limpio
+                              const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
                               typeCounts[tipo] = (typeCounts[tipo] || 0) + 1;
                           });
                           const breakdown = Object.entries(typeCounts)
@@ -301,7 +308,7 @@ const DashboardAdmin: React.FC = () => {
     const[deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const[weekToFinalize, setWeekToFinalize] = useState<WeekData | null>(null);
-    const [observation, setObservation] = useState('');
+    const[observation, setObservation] = useState('');
     
     const [view, setView] = useState<'dashboard' | 'create' | 'detail' | 'print' | 'history' | 'users' | 'settings' | 'masterStock'>('dashboard');
     const[selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
