@@ -34,7 +34,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const fetchPromise = Promise.all([
         dataService.getUsers(),
         dataService.getCurrentCount(),
-        dataService.getHistoricalCounts() // <-- OJO: Asegúrate de tener esta función en tu dataService.ts
+        dataService.getHistoricalCounts(), // <-- OJO: Asegúrate de tener esta función en tu dataService.ts
         dataService.getMasterStock()
       ]);
 
