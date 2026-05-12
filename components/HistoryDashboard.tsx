@@ -1,143 +1,176 @@
-
 import React, { useState } from 'react';
-import HistoryMetrics from './HistoryMetrics';
 import { useAppContext } from '../context/AppContext';
 import { CountCycle, WeekData } from '../types';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './ui/Table';
 import { Button } from './ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/Table';
-import { AdminWeekDetailView, getStatusBadge } from './DashboardAdmin';
-import AlertDialog from './ui/AlertDialog';
 
-interface HistoryDashboardProps {
-  onBack: () => void;
-}
+// Función para obtener el ID real sin el prefijo S1-
+const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
 
-const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ onBack }) => {
-  const { historicalCounts, deleteCurrentCount, user } = useAppContext();
+export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
+  const { historicalCounts, masterStock } = useAppContext();
   const [selectedCycle, setSelectedCycle] = useState<CountCycle | null>(null);
-  const [dialog, setDialog] = useState<{ isOpen: boolean; title: string; description: string; onConfirm: () => void } | null>(null);
-  const [selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
 
-  if (selectedWeek) {
-    return <AdminWeekDetailView week={selectedWeek} onBack={() => setSelectedWeek(null)} />;
-  }
-  
+  // Motor de cálculo de métricas (Igual al del Dashboard Principal)
+  const calculateMetrics = (items: any[]) => {
+      const total = items.length;
+      const countedItems = items.filter((i: any) => i.quantity !== null);
+      const counted = countedItems.length;
+      const deviations = countedItems.filter((i: any) => i.quantity !== i.systemStock);
+      const devCount = deviations.length;
+
+      const compPct = total > 0 ? ((counted / total) * 100).toFixed(2) : '0.00';
+      const devPct = counted > 0 ? ((devCount / counted) * 100).toFixed(2) : '0.00';
+
+      const typeCounts: Record<string, number> = {};
+      deviations.forEach((i: any) => {
+          const realId = getRealId(i.id);
+          const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
+          typeCounts[tipo] = (typeCounts[tipo] || 0) + 1;
+      });
+
+      const breakdown = Object.entries(typeCounts)
+          .map(([tipo, count]) => ({ tipo, pct: counted > 0 ? ((count / counted) * 100).toFixed(2) : '0.00' }))
+          .sort((a,b) => a.tipo.localeCompare(b.tipo));
+
+      return { total, counted, devCount, compPct, devPct, breakdown };
+  };
+
+  const renderBreakdown = (breakdown: any[]) => (
+    <div className="flex flex-col justify-center ml-3 pl-3 border-l border-slate-200 gap-1.5 min-w-[140px]">
+       <span className="text-[10px] uppercase text-slate-500 font-bold mb-1 tracking-wider">Apertura x Tipo</span>
+       {breakdown.length === 0 ? <span className="text-xs text-slate-400">-</span> : breakdown.map(b => (
+          <div key={b.tipo} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+              <span className="bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] min-w-[24px] text-center">{b.tipo}</span>
+              <span>{b.pct}%</span>
+          </div>
+       ))}
+    </div>
+  );
+
+  // VISTA DETALLE DEL CICLO HISTÓRICO
   if (selectedCycle) {
+    const generalMetrics = calculateMetrics(selectedCycle.weeks.flatMap(w => w.items));
+
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Button onClick={() => setSelectedCycle(null)} variant="secondary" className="mb-4">
-          &larr; Volver al Historial
-        </Button>
+        <Button onClick={() => setSelectedCycle(null)} variant="secondary" className="mb-4">&larr; Volver al Historial</Button>
+        <h2 className="text-3xl font-bold text-slate-800 mb-6">Detalle Histórico: {selectedCycle.name}</h2>
+        
+        {/* INDICADORES TOTALES DEL CICLO */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Cumplimiento Total del Ciclo</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-bold text-corporate-blue">{generalMetrics.compPct}%</div>
+                    <p className="text-xs text-slate-500">{generalMetrics.counted} de {generalMetrics.total} ítems contados en total.</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Desvíos Totales del Ciclo</CardTitle></CardHeader>
+                <CardContent className="flex justify-between items-center">
+                    <div className="flex-1">
+                        <div className="text-3xl font-bold text-red-600">{generalMetrics.devPct}%</div>
+                        <p className="text-xs text-slate-500">{generalMetrics.devCount} ítems con diferencias en todo el ciclo.</p>
+                    </div>
+                    {renderBreakdown(generalMetrics.breakdown)}
+                </CardContent>
+            </Card>
+        </div>
+
+        {/* INDICADORES POR SEMANA */}
         <Card>
-          <CardHeader>
-            <CardTitle>Detalle Histórico: {selectedCycle.name}</CardTitle>
-            <CardDescription>Creado el {new Date(selectedCycle.creationDate).toLocaleDateString('es-AR')}.</CardDescription>
-            <HistoryMetrics historicalCounts={[selectedCycle]} />
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Semana</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Modificado por</TableHead>
-                  <TableHead>Fecha de Modificación</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedCycle.weeks.map((week) => (
-                  <TableRow key={week.id} onClick={() => setSelectedWeek(week)} className="cursor-pointer hover:bg-slate-100">
-                    <TableCell className="font-medium">{week.name}</TableCell>
-                    <TableCell>{getStatusBadge(week.status)}</TableCell>
-                    <TableCell>{week.lastModifiedBy || 'N/A'}</TableCell>
-                    <TableCell>{week.lastModifiedDate ? new Date(week.lastModifiedDate).toLocaleString('es-AR') : 'N/A'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
+            <CardHeader>
+                <CardTitle>Desglose por Semanas</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Semana</TableHead>
+                            <TableHead>Fechas</TableHead>
+                            <TableHead className="min-w-[390px]">INDICADORES SEMANALES</TableHead>
+                            <TableHead>Comentario Final Admin</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {selectedCycle.weeks.map(week => {
+                            const weekMetrics = calculateMetrics(week.items);
+                            return (
+                                <TableRow key={week.id}>
+                                    <TableCell className="font-bold text-corporate-blue">{week.name}</TableCell>
+                                    <TableCell className="text-sm text-slate-600">{week.startDate} al {week.endDate}</TableCell>
+                                    <TableCell className="p-2">
+                                        <div className="flex gap-2 justify-start w-full">
+                                            <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px] flex flex-col justify-center">
+                                                <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">CUMPLIMIENTO</p>
+                                                <div className="text-xl font-bold text-corporate-blue leading-none">{weekMetrics.compPct}%</div>
+                                                <p className="text-[10px] text-slate-400 mt-1">{weekMetrics.counted} de {weekMetrics.total} ítems.</p>
+                                            </div>
+                                            <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[240px]">
+                                                <div className="flex flex-col justify-center">
+                                                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">DESVÍOS</p>
+                                                    <div className="text-xl font-bold text-red-600 leading-none">{weekMetrics.devPct}%</div>
+                                                    <p className="text-[10px] text-slate-400 mt-1">{weekMetrics.devCount} con dif.</p>
+                                                </div>
+                                                {renderBreakdown(weekMetrics.breakdown)}
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm italic text-slate-600">
+                                        {week.adminComment || '-'}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </CardContent>
         </Card>
       </div>
     );
   }
 
+  // VISTA PRINCIPAL (LISTADO DE CICLOS HISTÓRICOS)
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Button onClick={onBack} variant="secondary" className="mb-4">
-        &larr; Volver al Dashboard Principal
-      </Button>
+      <Button onClick={onBack} variant="secondary" className="mb-4">&larr; Volver al Dashboard</Button>
       <Card>
         <CardHeader>
-          <CardTitle>Historial de Conteos</CardTitle>
-          <CardDescription>Aquí puede consultar los resultados de ciclos de conteo anteriores.</CardDescription>
-          <HistoryMetrics historicalCounts={historicalCounts} />
+          <CardTitle>Historial de Conteos Cerrados</CardTitle>
         </CardHeader>
         <CardContent>
-          {historicalCounts.length > 0 ? (
+          {historicalCounts.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">No hay conteos en el historial.</p>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre del Conteo</TableHead>
-                  <TableHead>Fecha de Creación</TableHead>
-                  <TableHead>Semanas Completadas</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead>Período</TableHead>
+                  <TableHead>Semanas</TableHead>
+                  <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {historicalCounts.map((cycle) => {
-                  const totalWeeks = cycle.weeks.length;
-                  const completedWeeks = cycle.weeks.filter(w => w.status === 'Finalizado').length;
-                  const isEliminado = cycle.name.includes('(ELIMINADO)');
-                  return (
-                    <TableRow key={cycle.id} onClick={() => setSelectedCycle(cycle)} className="cursor-pointer hover:bg-slate-100">
-                      <TableCell className="font-medium">{cycle.name}</TableCell>
-                      <TableCell>{new Date(cycle.creationDate).toLocaleDateString('es-AR')}</TableCell>
-                      <TableCell>{completedWeeks} de {totalWeeks}</TableCell>
-                      <TableCell className="text-right">
-                        {user?.username === 'Admin' && (
-                          <Button 
-                            variant="destructive"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDialog({
-                                isOpen: true,
-                                title: '¿Eliminar Conteo Histórico?',
-                                description: `Está a punto de eliminar permanentemente el conteo "${cycle.name}". Esta acción no se puede deshacer.`,
-                                onConfirm: () => {
-                                  deleteCurrentCount(cycle.id);
-                                  setDialog(null);
-                                }
-                              });
-                            }}
-                          >
-                            Eliminar
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {historicalCounts.map(cycle => (
+                  <TableRow key={cycle.id}>
+                    <TableCell className="font-bold">{cycle.name}</TableCell>
+                    <TableCell>{cycle.startDate} al {cycle.endDate}</TableCell>
+                    <TableCell>{cycle.weeks.length}</TableCell>
+                    <TableCell className="text-right">
+                      <Button onClick={() => setSelectedCycle(cycle)} variant="outline" className="border-corporate-blue text-corporate-blue">
+                        Ver Detalles y Desvíos
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
-          ) : (
-            <p className="text-center text-slate-500 py-8">No hay conteos históricos para mostrar.</p>
           )}
         </CardContent>
       </Card>
-      {dialog && (
-        <AlertDialog
-          isOpen={dialog.isOpen}
-          onClose={() => setDialog(null)}
-          onConfirm={dialog.onConfirm}
-          title={dialog.title}
-          description={dialog.description}
-          confirmText="Sí, Eliminar"
-        />
-      )}
     </div>
   );
-};
-
-export default HistoryDashboard;
+}
