@@ -15,16 +15,16 @@ const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-'
 interface ConteoTableProps { week: WeekData; onBack: () => void; onPrint: (week: WeekData) => void; }
 
 const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
-  const { user, updateWeekItems, weeksData, finalizeWeek, masterStock } = useAppContext();
+  const { user, updateWeekItems, weeksData, finalizeWeek, masterStock, settings } = useAppContext();
   const currentWeekData = weeksData.find(w => w.id === week.id) || week;
   const [editedItems, setEditedItems] = useState<Item[]>(() => JSON.parse(JSON.stringify(currentWeekData.items)));
   const [isFinalized, setIsFinalized] = useState(currentWeekData.status === 'Finalizado');
   const [view, setView] = useState<'table' | 'report' | 'modify'>('table');
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const[showFinalizeModal, setShowFinalizeModal] = useState(false);
+  const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const[itemOrder, setItemOrder] = useState<string[]>([]);
-  const[hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [itemOrder, setItemOrder] = useState<string[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     const updatedWeek = weeksData.find(w => w.id === week.id);
@@ -69,6 +69,7 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
   const confirmFinalize = async () => { if (hasUnsavedChanges) { await updateWeekItems(week.id, editedItems); setHasUnsavedChanges(false); } finalizeWeek(week.id); setIsFinalized(true); setShowFinalizeModal(false); };
   
   const canEdit = user?.role === 'admin' || !isFinalized;
+  const hasPredefinedObs = settings.predefinedObservations && settings.predefinedObservations.length > 0;
 
   const sortedAndFilteredItems = useMemo(() => {
     const itemsById = new Map(editedItems.map(item =>[item.id, item]));
@@ -131,10 +132,7 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
                         <TableCell className="hidden sm:table-cell">
                           <Input type="text" value={item.location} onChange={(e) => handleItemChange(item.id, 'location', e.target.value)} disabled={!canEdit} className="w-32 font-mono" />
                         </TableCell>
-                        
-                        {/* NUEVA CELDA: TIPO */}
                         <TableCell className="hidden sm:table-cell text-center font-bold text-slate-500">{tipo}</TableCell>
-                        
                         <TableCell className="text-center">
                            <Input type="number" value={item.systemStock} onChange={(e) => handleItemChange(item.id, 'systemStock', e.target.valueAsNumber || 0)} disabled={!canEdit} className="w-24 text-center font-bold mx-auto bg-slate-50" min="0" />
                         </TableCell>
@@ -144,9 +142,33 @@ const ConteoTable: React.FC<ConteoTableProps> = ({ week, onBack, onPrint }) => {
                         <TableCell className="text-center">
                           {item.quantity !== null && item.systemStock !== item.quantity && <Check className="h-6 w-6 text-red-600 mx-auto" />}
                         </TableCell>
+                        
+                        {/* CELDA DE OBSERVACIÓN CON DESPLEGABLE O TEXTO LIBRE */}
                         <TableCell>
-                          <Input type="text" placeholder="Observación..." value={item.operatorObservation || ''} onChange={(e) => handleItemChange(item.id, 'operatorObservation', e.target.value)} disabled={!canEdit} className="min-w-[150px]" />
+                          {hasPredefinedObs ? (
+                            <select
+                              value={item.operatorObservation || ''}
+                              onChange={(e) => handleItemChange(item.id, 'operatorObservation', e.target.value)}
+                              disabled={!canEdit}
+                              className="w-full p-2 border border-slate-300 rounded-md text-sm bg-white min-w-[150px]"
+                            >
+                              <option value="">Seleccione observación...</option>
+                              {settings.predefinedObservations!.map((obs, idx) => (
+                                <option key={idx} value={obs}>{obs}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <Input 
+                              type="text" 
+                              placeholder="Observación..." 
+                              value={item.operatorObservation || ''} 
+                              onChange={(e) => handleItemChange(item.id, 'operatorObservation', e.target.value)} 
+                              disabled={!canEdit} 
+                              className="min-w-[150px]" 
+                            />
+                          )}
                         </TableCell>
+
                         {user?.role === 'admin' && (
                           <TableCell>
                             <Input type="text" placeholder="Nota admin..." value={item.adminComment || ''} onChange={(e) => handleItemChange(item.id, 'adminComment', e.target.value)} className="min-w-[150px] bg-yellow-50" />

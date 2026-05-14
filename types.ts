@@ -69,6 +69,7 @@ export interface SettingsData {
   companyName: string;
   logoUrl: string;
   loginLogoUrl: string;
+  predefinedObservations?: string[]; // NUEVO: Lista de observaciones
 }
 
 export interface AppContextType {
@@ -78,7 +79,7 @@ export interface AppContextType {
   users: User[];
   settings: SettingsData;
   masterStock: Record<string, MasterStockItem>;
-  masterStockDate: string | null; // NUEVO: Fecha de carga
+  masterStockDate: string | null;
   login: (username: string, password?: string) => Promise<boolean>;
   logout: () => void;
   changePassword: (newPassword: string) => Promise<void>;

@@ -7,7 +7,7 @@ import { RefreshCw } from '../components/ui/Icons';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const defaultSettings: SettingsData = { companyName: 'Gestión de Pañol', logoUrl: '', loginLogoUrl: '' };
+const defaultSettings: SettingsData = { companyName: 'Gestión de Pañol', logoUrl: '', loginLogoUrl: '',predefinedObservations: [] };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
