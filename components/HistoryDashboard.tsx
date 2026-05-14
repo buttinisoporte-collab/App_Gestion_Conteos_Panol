@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useAppContext } from '../context/AppContext';
 import { CountCycle, WeekData } from '../types';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './ui/Table';
 import { Button } from './ui/Button';
 
-// Función para obtener el ID real sin el prefijo S1-
 const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
 
 export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
   const { historicalCounts, masterStock } = useAppContext();
   const [selectedCycle, setSelectedCycle] = useState<CountCycle | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<WeekData | null>(null);
 
-  // Motor de cálculo de métricas (Igual al del Dashboard Principal)
   const calculateMetrics = (items: any[]) => {
       const total = items.length;
       const countedItems = items.filter((i: any) => i.quantity !== null);
@@ -49,16 +49,120 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
     </div>
   );
 
-  // VISTA DETALLE DEL CICLO HISTÓRICO
+  // NUEVO: Exportar Ranking de Desvíos ABC
+  const handleExportRankingExcel = (cycle: CountCycle) => {
+    const allDeviations: any[] = [];
+    
+    cycle.weeks.forEach(week => {
+      week.items.forEach(item => {
+        if (item.quantity !== null && item.quantity !== item.systemStock) {
+          const realId = getRealId(item.id);
+          const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
+          const absDiff = Math.abs(item.quantity - item.systemStock);
+          
+          allDeviations.push({
+            'Tipo (ABC)': tipo,
+            'Semana': week.name,
+            'ID Material': item.id,
+            'Descripción': item.description,
+            'Stock Sistema': item.systemStock,
+            'Cantidad Contada': item.quantity,
+            'Diferencia (Real)': item.quantity - item.systemStock,
+            'Diferencia (Absoluta)': absDiff,
+            'Contado Por': item.countedBy || 'Desconocido',
+            'Observación Operario': item.operatorObservation || '',
+            'Comentario Admin': item.adminComment || ''
+          });
+        }
+      });
+    });
+
+    // Ordenar por Tipo y luego por diferencia absoluta descendente
+    allDeviations.sort((a, b) => {
+      if (a['Tipo (ABC)'] < b['Tipo (ABC)']) return -1;
+      if (a['Tipo (ABC)'] > b['Tipo (ABC)']) return 1;
+      return b['Diferencia (Absoluta)'] - a['Diferencia (Absoluta)'];
+    });
+
+    const ws = XLSX.utils.json_to_sheet(allDeviations);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ranking Desvíos');
+    XLSX.writeFile(wb, `Ranking_Desvios_${cycle.name.replace(/ /g, '_')}.xlsx`);
+  };
+
+  // VISTA 3: DETALLE DE LOS ÍTEMS DE UNA SEMANA HISTÓRICA
+  if (selectedWeek) {
+    return (
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Button onClick={() => setSelectedWeek(null)} variant="secondary" className="mb-4">&larr; Volver al Ciclo</Button>
+        <Card>
+            <CardHeader>
+                <CardTitle>Detalle Histórico: {selectedWeek.name}</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="max-h-[70vh] overflow-y-auto relative border rounded-md">
+                    <Table>
+                        <TableHeader className="sticky top-0 bg-slate-100 z-20 shadow-sm outline outline-1 outline-slate-200">
+                            <TableRow>
+                                <TableHead>ID Material</TableHead>
+                                <TableHead>Descripción</TableHead>
+                                <TableHead className="text-center">Tipo</TableHead>
+                                <TableHead className="text-center">Stock / Contado</TableHead>
+                                <TableHead className="text-center">Dif.</TableHead>
+                                <TableHead>Último Operario</TableHead>
+                                <TableHead>Observación</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {selectedWeek.items.map(item => {
+                                const realId = getRealId(item.id);
+                                const tipo = masterStock[realId]?.type?.toUpperCase() || 'S/T';
+                                const hasDiff = item.quantity !== null && item.systemStock !== item.quantity;
+                                return (
+                                    <TableRow key={item.id} className={hasDiff ? 'bg-red-50' : ''}>
+                                        <TableCell className="font-mono text-sm">{item.id}</TableCell>
+                                        <TableCell className="font-medium text-sm">{item.description}</TableCell>
+                                        <TableCell className="text-center font-bold text-slate-500">{tipo}</TableCell>
+                                        <TableCell className="text-center">
+                                            <span className="text-slate-500">{item.systemStock}</span> / <span className="font-bold text-corporate-blue">{item.quantity ?? '-'}</span>
+                                        </TableCell>
+                                        <TableCell className={`text-center font-bold ${hasDiff ? 'text-red-600' : 'text-green-600'}`}>
+                                            {item.quantity !== null ? item.quantity - item.systemStock : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-sm font-semibold text-slate-700">
+                                            {item.countedBy || '-'}
+                                        </TableCell>
+                                        <TableCell className="text-sm italic text-slate-600">
+                                            {item.operatorObservation || '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // VISTA 2: DETALLE DEL CICLO (Con botón de Excel y Detalles semanales)
   if (selectedCycle) {
     const generalMetrics = calculateMetrics(selectedCycle.weeks.flatMap(w => w.items));
 
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Button onClick={() => setSelectedCycle(null)} variant="secondary" className="mb-4">&larr; Volver al Historial</Button>
-        <h2 className="text-3xl font-bold text-slate-800 mb-6">Detalle Histórico: {selectedCycle.name}</h2>
+        <div className="flex justify-between items-center mb-6">
+            <div>
+                <Button onClick={() => setSelectedCycle(null)} variant="secondary" className="mb-4">&larr; Volver al Historial</Button>
+                <h2 className="text-3xl font-bold text-slate-800">Detalle: {selectedCycle.name}</h2>
+            </div>
+            <Button onClick={() => handleExportRankingExcel(selectedCycle)} className="bg-green-700 text-white hover:bg-green-800 font-bold">
+                Descargar Ranking de Desvíos (Excel)
+            </Button>
+        </div>
         
-        {/* INDICADORES TOTALES DEL CICLO */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Cumplimiento Total del Ciclo</CardTitle></CardHeader>
@@ -79,11 +183,8 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
             </Card>
         </div>
 
-        {/* INDICADORES POR SEMANA */}
         <Card>
-            <CardHeader>
-                <CardTitle>Desglose por Semanas</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Desglose por Semanas</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto">
                 <Table>
                     <TableHeader>
@@ -91,7 +192,7 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
                             <TableHead>Semana</TableHead>
                             <TableHead>Fechas</TableHead>
                             <TableHead className="min-w-[390px]">INDICADORES SEMANALES</TableHead>
-                            <TableHead>Comentario Final Admin</TableHead>
+                            <TableHead className="text-center">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -118,8 +219,10 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-sm italic text-slate-600">
-                                        {week.adminComment || '-'}
+                                    <TableCell className="text-center">
+                                        <Button onClick={() => setSelectedWeek(week)} variant="outline" className="text-sm border-corporate-blue text-corporate-blue">
+                                            Ver Detalle de Ítems
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             );
@@ -132,7 +235,7 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
     );
   }
 
-  // VISTA PRINCIPAL (LISTADO DE CICLOS HISTÓRICOS)
+  // VISTA 1: LISTADO DE CICLOS HISTÓRICOS
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Button onClick={onBack} variant="secondary" className="mb-4">&larr; Volver al Dashboard</Button>
