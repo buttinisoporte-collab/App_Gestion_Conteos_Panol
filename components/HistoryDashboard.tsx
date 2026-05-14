@@ -49,7 +49,6 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
     </div>
   );
 
-  // NUEVO: Exportar Ranking de Desvíos ABC
   const handleExportRankingExcel = (cycle: CountCycle) => {
     const allDeviations: any[] = [];
     
@@ -70,6 +69,7 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
             'Diferencia (Real)': item.quantity - item.systemStock,
             'Diferencia (Absoluta)': absDiff,
             'Contado Por': item.countedBy || 'Desconocido',
+            'Fecha de Conteo': item.countedDate ? new Date(item.countedDate).toLocaleDateString('es-AR', { timeZone: 'UTC' }) : '',
             'Observación Operario': item.operatorObservation || '',
             'Comentario Admin': item.adminComment || ''
           });
@@ -77,7 +77,6 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
       });
     });
 
-    // Ordenar por Tipo y luego por diferencia absoluta descendente
     allDeviations.sort((a, b) => {
       if (a['Tipo (ABC)'] < b['Tipo (ABC)']) return -1;
       if (a['Tipo (ABC)'] > b['Tipo (ABC)']) return 1;
@@ -109,7 +108,7 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
                                 <TableHead className="text-center">Tipo</TableHead>
                                 <TableHead className="text-center">Stock / Contado</TableHead>
                                 <TableHead className="text-center">Dif.</TableHead>
-                                <TableHead>Último Operario</TableHead>
+                                <TableHead>Operario / Fecha</TableHead>
                                 <TableHead>Observación</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -129,8 +128,15 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
                                         <TableCell className={`text-center font-bold ${hasDiff ? 'text-red-600' : 'text-green-600'}`}>
                                             {item.quantity !== null ? item.quantity - item.systemStock : '-'}
                                         </TableCell>
-                                        <TableCell className="text-sm font-semibold text-slate-700">
-                                            {item.countedBy || '-'}
+                                        <TableCell>
+                                            <div className="text-sm font-semibold text-slate-700">
+                                                {item.countedBy || '-'}
+                                            </div>
+                                            {item.countedDate && (
+                                                <div className="text-xs text-slate-500 font-normal mt-0.5">
+                                                    {new Date(item.countedDate).toLocaleDateString('es-AR', { timeZone: 'UTC' })}
+                                                </div>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-sm italic text-slate-600">
                                             {item.operatorObservation || '-'}
