@@ -168,11 +168,12 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
         obsCount[obs] = (obsCount[obs] || 0) + 1;
 
         const diff = Math.abs(item.systemStock - item.quantity);
-        if (diff > 0) {
-          const desc = item.description ? item.description.trim() : 'Sin descripción';
-          const matName = item.manufacturerCode ? `${item.manufacturerCode} - ${desc}` : desc;
-          matDeviations[matName] = (matDeviations[matName] || 0) + diff;
-        }
+          if (diff > 0) {
+            const realId = item.id.includes('-') ? item.id.substring(item.id.indexOf('-') + 1) : item.id;
+            const desc = item.description ? item.description.trim() : 'Sin descripción';
+            const matName = `${realId} - ${desc}`;
+            matDeviations[matName] = (matDeviations[matName] || 0) + diff;
+          }
       }
     });
 
