@@ -265,10 +265,10 @@ const DashboardView: React.FC<{
                   </>
                 )}
                 
-                {user?.username === 'Admin' && (
+                {user?.username === 'admin' && (
                   <Button onClick={onShowReset} variant="destructive">Reiniciar Datos</Button>
                 )}
-                {user?.username === 'Admin' && weeksData.length > 0 && (
+                {user?.username === 'admin' && weeksData.length > 0 && (
                   <Button onClick={onDeleteCount} variant="destructive">Eliminar Conteo</Button>
                 )}
                 <Button onClick={refreshData} variant="outline" size="icon">
