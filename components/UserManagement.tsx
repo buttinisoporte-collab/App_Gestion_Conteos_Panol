@@ -219,6 +219,7 @@ const UserModal: React.FC<{ user: User | null; onClose: () => void; onSave: (use
           <label className="block text-sm font-medium text-slate-700">Rol</label>
           <select value={role} onChange={(e) => setRole(e.target.value as Role)} className="w-full p-2 border rounded-md">
             <option value="operario">Operario</option>
+            <option value="encargado">Encargado</option>
             <option value="admin">Admin</option>
           </select>
         </div>

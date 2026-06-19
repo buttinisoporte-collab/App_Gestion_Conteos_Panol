@@ -22,6 +22,8 @@ const AppContent: React.FC = () => {
         switch (user.role) {
             case 'admin':
                 return <DashboardAdmin />;
+            case 'encargado':
+                return <DashboardAdmin />;    
             case 'operario':
                 return <OperarioView />;
             default:

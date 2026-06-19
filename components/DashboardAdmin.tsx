@@ -18,6 +18,82 @@ import OperatorChart from './OperatorChart';
 import Settings from './Settings';
 import MasterStockManager from './MasterStockManager';
 
+const WeekRankings = ({ items }: { items: any[] }) => {
+  const [isObsExpanded, setIsObsExpanded] = React.useState(false);
+  const [isTopExpanded, setIsTopExpanded] = React.useState(false);
+
+  const obsCount: Record<string, number> = {};
+  const matDeviations: Record<string, number> = {};
+
+  items.forEach((item: any) => {
+    if (item.quantity !== null && item.quantity !== item.systemStock) {
+      const obs = item.operatorObservation?.trim() || 'Sin observación';
+      obsCount[obs] = (obsCount[obs] || 0) + 1;
+
+      const diff = Math.abs(item.systemStock - item.quantity);
+      if (diff > 0) {
+        const desc = item.description ? item.description.trim() : 'Sin descripción';
+        const matName = item.manufacturerCode ? `${item.manufacturerCode} - ${desc}` : desc;
+        matDeviations[matName] = (matDeviations[matName] || 0) + diff;
+      }
+    }
+  });
+
+  const obsRanking = Object.entries(obsCount).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+  const top10Materials = Object.entries(matDeviations).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }));
+
+  // Si no hay observaciones ni desvíos, no mostramos nada
+  if (obsRanking.length === 0 && top10Materials.length === 0) return null;
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-2 mt-2 w-full">
+      {obsRanking.length > 0 && (
+        <div className="border border-gray-200 rounded-md p-2 bg-white flex-1 min-w-[250px] shadow-sm">
+          <div 
+            className="flex justify-between items-center cursor-pointer mb-1"
+            onClick={() => setIsObsExpanded(!isObsExpanded)}
+          >
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Observaciones Detectadas</span>
+            <span className="text-red-500 text-xs">{isObsExpanded ? '▲' : '▼'}</span>
+          </div>
+          {isObsExpanded && (
+            <ul className="text-xs text-gray-700 mt-2 space-y-1">
+              {obsRanking.map((o, idx) => (
+                <li key={idx} className="flex justify-between border-b border-gray-100 last:border-0 pb-1">
+                  <span className="truncate pr-2">{o.name}</span>
+                  <span className="font-semibold">{o.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {top10Materials.length > 0 && (
+        <div className="border border-gray-200 rounded-md p-2 bg-white flex-1 min-w-[250px] shadow-sm">
+          <div 
+            className="flex justify-between items-center cursor-pointer mb-1"
+            onClick={() => setIsTopExpanded(!isTopExpanded)}
+          >
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Top 10 Materiales con Desvíos</span>
+            <span className="text-red-500 text-xs">{isTopExpanded ? '▲' : '▼'}</span>
+          </div>
+          {isTopExpanded && (
+            <ul className="text-xs text-gray-700 mt-2 space-y-1">
+              {top10Materials.map((m, idx) => (
+                <li key={idx} className="flex justify-between border-b border-gray-100 last:border-0 pb-1">
+                  <span className="truncate pr-2 max-w-[220px]" title={m.name}>{m.name}</span>
+                  <span className="font-semibold">{m.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const getRealId = (id: string) => id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
 
 export const getStatusBadge = (status: WeekStatus) => {
@@ -175,11 +251,20 @@ const DashboardView: React.FC<{
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <h2 className="text-3xl font-bold text-slate-800">Dashboard de Administrador</h2>
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
-                <Button onClick={onShowMasterStock} variant="outline" className="border-indigo-600 text-indigo-700 hover:bg-indigo-50 font-bold">Cargar Stock Maestro</Button>
+                {user?.role === 'admin' && (
+                  <Button onClick={onShowMasterStock} variant="outline" className="border-indigo-600 text-indigo-700 hover:bg-indigo-50 font-bold">Cargar Stock Maestro</Button>
+                )}
+                
                 <Button onClick={onShowHistory} variant="secondary">Ver Historial de Conteos</Button>
-                <Button onClick={onShowUsers} variant="secondary">Gestionar Usuarios</Button>
-                <Button onClick={onShowSettings} variant="outline">Configuración</Button>
-                <Button onClick={onShowCreate} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Crear Nuevo Conteo</Button>
+                
+                {user?.role === 'admin' && (
+                  <>
+                    <Button onClick={onShowUsers} variant="secondary">Gestionar Usuarios</Button>
+                    <Button onClick={onShowSettings} variant="outline">Configuración</Button>
+                    <Button onClick={onShowCreate} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Crear Nuevo Conteo</Button>
+                  </>
+                )}
+                
                 {user?.username === 'Admin' && (
                   <Button onClick={onShowReset} variant="destructive">Reiniciar Datos</Button>
                 )}
@@ -195,13 +280,17 @@ const DashboardView: React.FC<{
             {weeksData.length === 0 ? (
               <Card className="text-center py-12">
                 <CardHeader>
-                  <CardTitle>No hay un conteo activo</CardTitle>
-                  <CardDescription>Cree un nuevo ciclo de conteo para comenzar a trabajar.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={onShowCreate} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Crear Nuevo Conteo</Button>
-                </CardContent>
-              </Card>
+              <CardTitle>No hay un conteo activo</CardTitle>
+              <CardDescription>
+                {user?.role === 'admin' ? 'Cree un nuevo ciclo de conteo para comenzar a trabajar.' : 'Actualmente no hay ningún conteo activo.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {user?.role === 'admin' && (
+                <Button onClick={onShowCreate} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Crear Nuevo Conteo</Button>
+              )}
+            </CardContent>
+            </Card>
             ) : (
               <div className="mb-8">
                 <DashboardIndicators weeksData={weeksData} />
@@ -280,27 +369,32 @@ const DashboardView: React.FC<{
                               <TableCell>{getStatusBadge(week.status)}</TableCell>
                               
                               <TableCell className="p-2">
-                                <div className="flex gap-2 justify-start w-full">
-                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px] flex flex-col justify-center">
-                                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">CUMPLIMIENTO</p>
-                                    <div className="text-xl font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
-                                    <p className="text-[10px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
-                                  </div>
-                                  <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[240px]">
-                                    <div className="flex flex-col justify-center">
-                                      <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">DESVÍOS</p>
-                                      <div className="text-xl font-bold text-red-600 leading-none">{weekDevPct}%</div>
-                                      <p className="text-[10px] text-slate-400 mt-1">{weekDevCount} con dif.</p>
+                                <div className="flex flex-col gap-2 w-full">
+                                  <div className="flex gap-2 justify-start w-full">
+                                    <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px] flex flex-col justify-center">
+                                      <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">CUMPLIMIENTO</p>
+                                      <div className="text-xl font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
+                                      <p className="text-[10px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
                                     </div>
-                                    <div className="flex flex-col justify-center ml-3 pl-3 border-l border-slate-200 gap-1.5">
-                                       {breakdown.length === 0 ? <span className="text-xs text-slate-400">-</span> : breakdown.map(b => (
-                                          <div key={b.tipo} className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                                              <span className="bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] min-w-[24px] text-center">{b.tipo}</span>
-                                              <span>{b.pct}%</span>
-                                          </div>
-                                       ))}
+                                    <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[240px]">
+                                      <div className="flex flex-col justify-center">
+                                        <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">DESVÍOS</p>
+                                        <div className="text-xl font-bold text-red-600 leading-none">{weekDevPct}%</div>
+                                        <p className="text-[10px] text-slate-400 mt-1">{weekDevCount} con dif.</p>
+                                      </div>
+                                      <div className="flex flex-col justify-center ml-3 pl-3 border-l border-slate-200 gap-1.5">
+                                         {breakdown.length === 0 ? <span className="text-xs text-slate-400">-</span> : breakdown.map(b => (
+                                            <div key={b.tipo} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                                                <span className="bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] min-w-[24px] text-center">{b.tipo}</span>
+                                                <span>{b.pct}%</span>
+                                            </div>
+                                         ))}
+                                      </div>
                                     </div>
                                   </div>
+                                  
+                                  {/* AQUÍ INYECTAMOS LOS RANKINGS */}
+                                  <WeekRankings items={week.items} />
                                 </div>
                               </TableCell>
 
@@ -314,14 +408,15 @@ const DashboardView: React.FC<{
                               <TableCell>
                                  <Input 
                                     defaultValue={week.adminComment || ''}
-                                    placeholder="Escriba una nota y presione Enter o haga clic fuera..."
+                                    placeholder={user?.role === 'admin' ? "Escriba una nota y presione Enter o haga clic fuera..." : "Sin comentarios"}
                                     onBlur={(e) => updateWeekComment(week.id, e.target.value)}
                                     className="min-w-[220px] bg-slate-50 text-sm"
+                                    disabled={user?.role !== 'admin'}
                                  />
                               </TableCell>
 
                               <TableCell className="text-right">
-                                  {(week.status === WeekStatus.EnProgreso || week.status === WeekStatus.Pendiente) && (
+                                  {user?.role === 'admin' && (week.status === WeekStatus.EnProgreso || week.status === WeekStatus.Pendiente) && (
                                       <Button size="sm" onClick={() => onFinalizeWeek(week)} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Finalizar Semana</Button>
                                   )}
                               </TableCell>

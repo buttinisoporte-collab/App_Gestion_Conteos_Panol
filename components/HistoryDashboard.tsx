@@ -153,9 +153,31 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
     );
   }
 
-  // VISTA 2: DETALLE DEL CICLO (Con botón de Excel y Detalles semanales)
+    // VISTA 2: DETALLE DEL CICLO (Con botón de Excel y Detalles semanales)
   if (selectedCycle) {
-    const generalMetrics = calculateMetrics(selectedCycle.weeks.flatMap(w => w.items));
+    const allItems = selectedCycle.weeks.flatMap(w => w.items);
+    const generalMetrics = calculateMetrics(allItems);
+
+    // Lógica para rankings globales del ciclo
+    const obsCount: Record<string, number> = {};
+    const matDeviations: Record<string, number> = {};
+
+    allItems.forEach((item: any) => {
+      if (item.quantity !== null && item.quantity !== item.systemStock) {
+        const obs = item.operatorObservation?.trim() || 'Sin observación';
+        obsCount[obs] = (obsCount[obs] || 0) + 1;
+
+        const diff = Math.abs(item.systemStock - item.quantity);
+        if (diff > 0) {
+          const desc = item.description ? item.description.trim() : 'Sin descripción';
+          const matName = item.manufacturerCode ? `${item.manufacturerCode} - ${desc}` : desc;
+          matDeviations[matName] = (matDeviations[matName] || 0) + diff;
+        }
+      }
+    });
+
+    const obsRanking = Object.entries(obsCount).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+    const top10Materials = Object.entries(matDeviations).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }));
 
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -169,15 +191,15 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
             </Button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
+            <Card className="col-span-1 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Cumplimiento Total del Ciclo</CardTitle></CardHeader>
                 <CardContent>
                     <div className="text-3xl font-bold text-corporate-blue">{generalMetrics.compPct}%</div>
                     <p className="text-xs text-slate-500">{generalMetrics.counted} de {generalMetrics.total} ítems contados en total.</p>
                 </CardContent>
             </Card>
-            <Card>
+            <Card className="col-span-1 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Desvíos Totales del Ciclo</CardTitle></CardHeader>
                 <CardContent className="flex justify-between items-center">
                     <div className="flex-1">
@@ -185,6 +207,50 @@ export default function HistoryDashboard({ onBack }: { onBack: () => void }) {
                         <p className="text-xs text-slate-500">{generalMetrics.devCount} ítems con diferencias en todo el ciclo.</p>
                     </div>
                     {renderBreakdown(generalMetrics.breakdown)}
+                </CardContent>
+            </Card>
+            
+            <Card className="col-span-1 shadow-sm">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Observaciones Detectadas del ciclo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                        {obsRanking.length > 0 ? (
+                            <ul className="text-xs text-slate-700 space-y-1">
+                                {obsRanking.map((o, idx) => (
+                                    <li key={idx} className="flex justify-between border-b border-slate-100 last:border-0 pb-1">
+                                        <span className="truncate pr-2">{o.name}</span>
+                                        <span className="font-semibold">{o.count}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-xs text-slate-400">No hay observaciones.</p>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="col-span-1 shadow-sm">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Top 10 Materiales con desvíos del ciclo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                        {top10Materials.length > 0 ? (
+                            <ul className="text-xs text-slate-700 space-y-1">
+                                {top10Materials.map((m, idx) => (
+                                    <li key={idx} className="flex justify-between border-b border-slate-100 last:border-0 pb-1">
+                                        <span className="truncate pr-2" title={m.name}>{m.name}</span>
+                                        <span className="font-semibold">{m.count}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-xs text-slate-400">No hay desvíos.</p>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
         </div>
