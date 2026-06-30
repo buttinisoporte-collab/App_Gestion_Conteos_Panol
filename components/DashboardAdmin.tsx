@@ -328,7 +328,7 @@ const DashboardView: React.FC<{
                   <OperatorChart weeksData={weeksData} users={users} />
                 </div>
           
-                <Card>
+                  <Card>
                   <CardHeader>
                     <CardTitle>Estado de Semanas (Conteo Actual)</CardTitle>
                   </CardHeader>
@@ -382,9 +382,17 @@ const DashboardView: React.FC<{
                                         <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">DESVÍOS</p>
                                         <div className="text-xl font-bold text-red-600 leading-none">{weekDevPct}%</div>
                                         <p className="text-[10px] text-slate-400 mt-1">{weekDevCount} dif.</p>
+                                      </div>
+                                      <div className="flex flex-col justify-center ml-3 pl-3 border-l border-slate-200 gap-1.5">
+                                         {breakdown.length === 0 ? <span className="text-xs text-slate-400">-</span> : breakdown.map(b => (
+                                            <div key={b.tipo} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                                                <span className="bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] min-w-[24px] text-center">{b.tipo}</span>
+                                                <span>{b.pct}%</span>
+                                            </div>
+                                         ))}
+                                      </div>
+                                    </div>
                                   </div>
-                                  
-                                  {/* AQUÍ INYECTAMOS LOS RANKINGS */}
                                   <WeekRankings items={week.items} />
                                 </div>
                               </TableCell>
@@ -399,9 +407,9 @@ const DashboardView: React.FC<{
                               <TableCell>
                                  <Input 
                                     defaultValue={week.adminComment || ''}
-                                    placeholder={user?.role === 'admin' ? "Escriba una nota y presione Enter o haga clic fuera..." : "Sin comentarios"}
+                                    placeholder={user?.role === 'admin' ? "Escriba una nota..." : "Sin comentarios"}
                                     onBlur={(e) => updateWeekComment(week.id, e.target.value)}
-                                    className="min-w-[220px] bg-slate-50 text-sm"
+                                    className="min-w-[200px] bg-slate-50 text-sm"
                                     disabled={user?.role !== 'admin'}
                                  />
                               </TableCell>
