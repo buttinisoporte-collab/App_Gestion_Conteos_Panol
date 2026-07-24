@@ -54,12 +54,53 @@ export default function MasterStockManager({ onBack }: { onBack: () => void }) {
                  onChange={e => setPasteData(e.target.value)}
               />
               <div className="mt-4 flex gap-2">
-                 <Button onClick={handleProcess} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">
-                     Procesar y Guardar Base de Datos
+                 <Button onClick={handleProcess} className="bg-corporate-blue text-white hover:bg-corporate-blue/90 font-bold">
+                     Procesar y Actualizar
                  </Button>
               </div>
            </CardContent>
         </Card>
+
+        {showConfirmModal && (
+          <Modal 
+            isOpen={true} 
+            onClose={() => setShowConfirmModal(false)} 
+            onConfirm={() => executeUpdate(processedData, options.updateLoc, options.updateStock)}
+            title="Confirmar Actualización de Conteo Activo"
+          >
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Se detectó un <b>Conteo Actual</b> en curso. Las descripciones se actualizarán automáticamente en todas las semanas.
+              </p>
+              <div className="bg-amber-50 p-4 rounded-md border border-amber-200">
+                <p className="text-sm font-bold text-amber-800 mb-3">¿Desea actualizar también los siguientes datos en las semanas activas?</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-2 hover:bg-amber-100 rounded cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 rounded border-amber-400 text-amber-600"
+                      checked={options.updateLoc}
+                      onChange={e => setOptions({...options, updateLoc: e.target.checked})}
+                    />
+                    <span className="text-sm font-medium">Actualizar Ubicaciones</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-2 hover:bg-amber-100 rounded cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 rounded border-amber-400 text-amber-600"
+                      checked={options.updateStock}
+                      onChange={e => setOptions({...options, updateStock: e.target.checked})}
+                    />
+                    <span className="text-sm font-medium">Actualizar Stock de Sistema (Columna 5)</span>
+                  </label>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 italic">
+                * Nota: Ubicación y Stock solo se actualizarán en semanas con estado "En Progreso" o "Pendiente".
+              </p>
+            </div>
+          </Modal>
+        )}
      </div>
   );
 }
