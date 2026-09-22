@@ -16,7 +16,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [historicalCounts, setHistoricalCounts] = useState<CountCycle[]>([]);
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
   const [masterStock, setMasterStock] = useState<Record<string, MasterStockItem>>({});
-  const[masterStockDate, setMasterStockDate] = useState<string | null>(null);
+  const[masterStockDate, setMasterStockDate] = useState<string | null>(null);updateMasterStock
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshData = useCallback(async () => {
@@ -159,10 +159,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (success) setCountCycle(updatedCycle);
   };
 
-  const updateMasterStock = async (data: Record<string, MasterStockItem>) => {
+  const updateMasterStock = async (
+    data: Record<string, MasterStockItem>, 
+    updateLocations: boolean = false, 
+    updateStock: boolean = false
+  ) => {
     const now = new Date().toISOString();
+    
+    // 1. Guardar en base de datos de Stock Maestro
     const success = await dataService.saveMasterStock(data, now);
-    if (success) { setMasterStock(data); setMasterStockDate(now); }
+    
+    if (success) {
+      setMasterStock(data);
+      setMasterStockDate(now);
+
+      // 2. Si hay un conteo activo, propagar cambios
+      if (countCycle) {
+        const updatedWeeks = countCycle.weeks.map(week => {
+          // Solo actualizamos ubicación y stock en semanas NO finalizadas si el usuario lo pidió
+          const canUpdateDetails = (week.status === WeekStatus.EnProgreso || week.status === WeekStatus.Pendiente);
+          
+          const updatedItems = week.items.map(item => {
+            // Obtener el ID real quitando el prefijo "S1-"
+            const realId = item.id.includes('-') ? item.id.split('-')[1] : item.id;
+            const newData = data[realId];
+
+            if (newData) {
+              return {
+                ...item,
+                // Descripción se actualiza SIEMPRE en todas las semanas del ciclo
+                description: newData.description,
+                // Ubicación y Stock solo si se confirmó y la semana está activa
+                location: (updateLocations && canUpdateDetails) ? newData.location : item.location,
+                systemStock: (updateStock && canUpdateDetails && newData.systemStock !== undefined) 
+                  ? newData.systemStock 
+                  : item.systemStock
+              };
+            }
+            return item;
+          });
+
+          return { ...week, items: updatedItems };
+        });
+
+        const updatedCycle = { ...countCycle, weeks: updatedWeeks };
+        await dataService.saveCountCycle(updatedCycle);
+        setCountCycle(updatedCycle);
+      }
+    }
+    return success;
   };
 
   const deleteCurrentCount = async (cycleId?: string) => {
