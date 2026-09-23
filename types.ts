@@ -1,5 +1,12 @@
 export type Role = 'admin' | 'operario' | 'encargado';
 
+export interface UserAuditLog {
+  date: string;
+  action: string;
+  performedBy: string;
+  details: string;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -10,6 +17,15 @@ export interface User {
   role: Role;
   status: 'active' | 'inactive';
   mustChangePassword?: boolean;
+  auditLog?: UserAuditLog[];
+}
+
+export interface ItemAuditLog {
+  user: string;
+  date: string;
+  field?: string;
+  oldValue?: any;
+  newValue?: any;
 }
 
 export interface Item {
@@ -25,6 +41,7 @@ export interface Item {
   materialId?: string;
   operatorObservation?: string;
   adminComment?: string;
+  auditLog?: ItemAuditLog[];
 }
 
 export enum WeekStatus {
@@ -63,6 +80,7 @@ export interface MasterStockItem {
   description: string;
   location: string;
   type: string;
+  systemStock?: number;
 }
 
 export interface SettingsData {
@@ -93,7 +111,7 @@ export interface AppContextType {
   deleteUser: (userId: string) => Promise<void>;
   updateWeekItems: (weekId: string, newItems: Item[]) => Promise<void>;
   updateWeekComment: (weekId: string, comment: string) => Promise<void>;
-  updateMasterStock: (data: Record<string, MasterStockItem>) => Promise<void>;
+  updateMasterStock: (data: Record<string, MasterStockItem>, updateLocations?: boolean, updateStock?: boolean) => Promise<boolean>;
   deleteCurrentCount: (cycleId?: string) => Promise<void>;
   refreshData: () => Promise<void>;
   resetApplicationData: () => Promise<void>;

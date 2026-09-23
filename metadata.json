@@ -1,5 +1,5 @@
 {
-  "name": "Gestión de Conteos de Pañol",
-  "description": "Una aplicación web para la gestión de inventario y conteos de pañol, organizada por semanas. Permite roles de operario y administrador para el seguimiento y la finalización de tareas de conteo.",
+  "name": "QA-Dev - Gestión de Conteos de Pañol",
+  "description": "Aqui se porbarán los nuevos desarrollos de la APP que luego se iran subiendo (cargando manualmente los cambios a GITHUB), en la rama qa-desarrollo del repo para testear en Vercel. \nCuando esté ok la mejora se hace un pull request al main del repo y pasa a producción en vercel. ",
   "requestFramePermissions": []
 }

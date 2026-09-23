@@ -328,20 +328,20 @@ const DashboardView: React.FC<{
                   <OperatorChart weeksData={weeksData} users={users} />
                 </div>
           
-                <Card>
+                  <Card>
                   <CardHeader>
                     <CardTitle>Estado de Semanas (Conteo Actual)</CardTitle>
                   </CardHeader>
-                  <CardContent className="overflow-x-auto">
-                    <Table>
+                  <CardContent className="overflow-x-auto pb-4">
+                    <Table className="min-w-[1150px] w-full">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Semana</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="min-w-[390px]">INDICADORES SEMANALES</TableHead>
-                          <TableHead className="text-center">Descargas</TableHead>
-                          <TableHead>Comentario de Admin</TableHead>
-                          <TableHead className="text-right">Finalizar</TableHead>
+                          <TableHead className="w-[100px]">Semana</TableHead>
+                          <TableHead className="w-[110px]">Estado</TableHead>
+                          <TableHead className="min-w-[420px]">INDICADORES SEMANALES</TableHead>
+                          <TableHead className="text-center w-[130px]">Descargas</TableHead>
+                          <TableHead className="min-w-[200px]">Comentario de Admin</TableHead>
+                          <TableHead className="text-right w-[140px]">Finalizar</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -372,16 +372,16 @@ const DashboardView: React.FC<{
                               <TableCell className="p-2">
                                 <div className="flex flex-col gap-2 w-full">
                                   <div className="flex gap-2 justify-start w-full">
-                                    <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[130px] flex flex-col justify-center">
+                                    <div className="bg-white border border-slate-200 rounded p-2 shadow-sm min-w-[120px] flex flex-col justify-center">
                                       <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">CUMPLIMIENTO</p>
                                       <div className="text-xl font-bold text-corporate-blue leading-none">{weekCompPct}%</div>
-                                      <p className="text-[10px] text-slate-400 mt-1">{weekCounted} de {weekTotal} ítems.</p>
+                                      <p className="text-[10px] text-slate-400 mt-1">{weekCounted}/{weekTotal} ítems</p>
                                     </div>
-                                    <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[240px]">
+                                    <div className="bg-white border border-slate-200 rounded p-2 shadow-sm flex justify-between min-w-[210px]">
                                       <div className="flex flex-col justify-center">
                                         <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider">DESVÍOS</p>
                                         <div className="text-xl font-bold text-red-600 leading-none">{weekDevPct}%</div>
-                                        <p className="text-[10px] text-slate-400 mt-1">{weekDevCount} con dif.</p>
+                                        <p className="text-[10px] text-slate-400 mt-1">{weekDevCount} dif.</p>
                                       </div>
                                       <div className="flex flex-col justify-center ml-3 pl-3 border-l border-slate-200 gap-1.5">
                                          {breakdown.length === 0 ? <span className="text-xs text-slate-400">-</span> : breakdown.map(b => (
@@ -393,8 +393,6 @@ const DashboardView: React.FC<{
                                       </div>
                                     </div>
                                   </div>
-                                  
-                                  {/* AQUÍ INYECTAMOS LOS RANKINGS */}
                                   <WeekRankings items={week.items} />
                                 </div>
                               </TableCell>
@@ -409,16 +407,16 @@ const DashboardView: React.FC<{
                               <TableCell>
                                  <Input 
                                     defaultValue={week.adminComment || ''}
-                                    placeholder={user?.role === 'admin' ? "Escriba una nota y presione Enter o haga clic fuera..." : "Sin comentarios"}
+                                    placeholder={user?.role === 'admin' ? "Escriba una nota..." : "Sin comentarios"}
                                     onBlur={(e) => updateWeekComment(week.id, e.target.value)}
-                                    className="min-w-[220px] bg-slate-50 text-sm"
+                                    className="min-w-[200px] bg-slate-50 text-sm"
                                     disabled={user?.role !== 'admin'}
                                  />
                               </TableCell>
 
-                              <TableCell className="text-right">
+                              <TableCell className="text-right whitespace-nowrap">
                                   {user?.role === 'admin' && (week.status === WeekStatus.EnProgreso || week.status === WeekStatus.Pendiente) && (
-                                      <Button size="sm" onClick={() => onFinalizeWeek(week)} className="bg-corporate-blue text-white hover:bg-corporate-blue/90">Finalizar Semana</Button>
+                                      <Button size="sm" onClick={() => onFinalizeWeek(week)} className="bg-corporate-blue text-white hover:bg-corporate-blue/90 w-full">Finalizar Semana</Button>
                                   )}
                               </TableCell>
                             </TableRow>

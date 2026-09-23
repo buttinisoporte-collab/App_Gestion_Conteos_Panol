@@ -1,9 +1,9 @@
 import React from 'react';
-import { WeekData } from '../types';
+import { WeekData, User } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 
-export default function OperatorChart({ weeksData }: { weeksData: WeekData[] }) {
+export default function OperatorChart({ weeksData, users }: { weeksData: WeekData[]; users?: User[] }) {
   const counts: Record<string, number> = {};
 
   weeksData.forEach(week => {

@@ -16,35 +16,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [historicalCounts, setHistoricalCounts] = useState<CountCycle[]>([]);
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
   const [masterStock, setMasterStock] = useState<Record<string, MasterStockItem>>({});
-  const[masterStockDate, setMasterStockDate] = useState<string | null>(null);updateMasterStock
+  const [masterStockDate, setMasterStockDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout fetching data')), 15000));
-
     try {
-      const fetchPromise = Promise.all([
-        dataService.getUsers(),
-        dataService.getCurrentCount(),
-        dataService.getHistoricalCounts(),
-        dataService.getMasterStock()
-      ]);
+      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical, fetchedMasterStockObj] =
+        await Promise.all([
+          dataService.getUsers(),
+          dataService.getCurrentCount(),
+          dataService.getHistoricalCounts(),
+          dataService.getMasterStock()
+        ]);
 
-      const [fetchedUsers, fetchedCurrentCount, fetchedHistorical, fetchedMasterStockObj] = await (Promise.race([fetchPromise, timeoutPromise]) as Promise<any>);
-      
-      setUsers(fetchedUsers || []);
+      if (fetchedUsers && fetchedUsers.length > 0) {
+        setUsers(fetchedUsers);
+      } else {
+        const localUsers = await dataService.getUsers();
+        setUsers(localUsers || []);
+      }
+
       setCountCycle(fetchedCurrentCount || null);
-      setHistoricalCounts(fetchedHistorical ||[]);
+      setHistoricalCounts(fetchedHistorical || []);
       setMasterStock(fetchedMasterStockObj?.items || {});
       setMasterStockDate(fetchedMasterStockObj?.lastUpdated || null);
     } catch (error) {
-      console.error('Error refreshing data:', error);
-      setUsers([]);
+      console.warn('Fallback al refrescar datos:', error);
+      const fallbackUsers = await dataService.getUsers();
+      setUsers(fallbackUsers || []);
     } finally {
       setIsLoading(false);
     }
-  },[]);
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -53,7 +57,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (remoteSettings) setSettings(remoteSettings);
         else await settingsService.updateAllSettings(defaultSettings);
       } catch (error) {
-        console.warn('Ignorando error de settings para no trabar la app:', error);
+        console.warn('Ignorando error de settings:', error);
       } finally {
         await refreshData();
       }
@@ -62,16 +66,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [refreshData]);
 
   const resetApplicationData = async () => {
-    if (user?.username !== 'Admin') return alert('Acción no permitida.');
-    if (window.confirm('¿Está seguro? Esta acción borrará TODOS los datos y restaurará la aplicación a su estado inicial.')) {
-      alert('Para reiniciar los datos en Firebase, elimine las colecciones directamente desde la consola.');
+    if (user?.username.toLowerCase() !== 'admin') return alert('Acción no permitida.');
+    if (window.confirm('¿Está seguro? Esta acción restaurará la aplicación a su estado inicial con usuarios de fábrica y ciclo demo.')) {
+      await dataService.seedInitialData();
+      await refreshData();
+      alert('Datos reiniciados con éxito.');
     }
   };
 
   const login = async (username: string, password?: string): Promise<boolean> => {
-    const foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-    if (foundUser && foundUser.status === 'inactive') { alert('Su usuario está inactivo.'); return false; }
-    if (foundUser) { setUser(foundUser); return true; }
+    const cleanUsername = username.trim().toLowerCase();
+    let currentUsers = users;
+    let foundUser = currentUsers.find(
+      u => u.username.trim().toLowerCase() === cleanUsername && u.password === password
+    );
+
+    // Si aún no se encontró en memoria, intentar refrescar usuarios directamente desde Firebase/dataService
+    if (!foundUser) {
+      try {
+        const freshUsers = await dataService.getUsers();
+        if (freshUsers && freshUsers.length > 0) {
+          setUsers(freshUsers);
+          currentUsers = freshUsers;
+          foundUser = freshUsers.find(
+            u => u.username.trim().toLowerCase() === cleanUsername && u.password === password
+          );
+        }
+      } catch (e) {
+        console.warn('Error refrescando usuarios durante login:', e);
+      }
+    }
+
+    if (foundUser && foundUser.status === 'inactive') {
+      alert('Su usuario está inactivo. Contacte al administrador.');
+      return false;
+    }
+    if (foundUser) {
+      setUser(foundUser);
+      return true;
+    }
     return false;
   };
 
@@ -220,8 +253,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user || user.role !== 'admin') return;
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
-    const newStatus = targetUser.status === 'active' ? 'inactive' : 'active';
-    const updatedUser = { ...targetUser, status: newStatus };
+    const newStatus: 'active' | 'inactive' = targetUser.status === 'active' ? 'inactive' : 'active';
+    const updatedUser: User = { ...targetUser, status: newStatus };
     const success = await dataService.saveUser(updatedUser);
     if (success) setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
   };
