@@ -7,7 +7,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
 export default function CrearConteo({ onBack }: { onBack: () => void }) {
-  const { createNewCount } = useAppContext();
+  const { createNewCount, masterStock } = useAppContext();
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -29,15 +29,12 @@ export default function CrearConteo({ onBack }: { onBack: () => void }) {
       setWeeks(weeks.filter(w => w.id !== id));
   };
 
-  // NUEVO: Función para descargar la plantilla Excel vacía
+  // Función para descargar la plantilla Excel vacía con solo ID_Material
   const handleDownloadTemplate = () => {
     const templateData = [
-        {
-            "ID_Material": "Ej: 10054",
-            "Descripción": "Ej: FILTRO DE ACEITE",
-            "Ubicación": "Ej: ESTANTE A1",
-            "Stock_Sistema": 15
-        }
+        { "ID_Material": "10054" },
+        { "ID_Material": "10055" },
+        { "ID_Material": "10056" }
     ];
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
@@ -53,38 +50,65 @@ export default function CrearConteo({ onBack }: { onBack: () => void }) {
           return;
       }
 
-      const parsedWeeks: WeekData[] =[];
+      const parsedWeeks: WeekData[] = [];
 
       for (let i = 0; i < weeks.length; i++) {
           const w = weeks[i];
           if (!w.start || !w.end || !w.rawData.trim()) {
-              alert(`Complete las fechas y pegue los datos para la ${w.name}`);
+              alert(`Complete las fechas y pegue los ID_Material para la ${w.name}`);
               return;
           }
 
           const lines = w.rawData.trim().split('\n');
-          const items =[];
+          const items = [];
+          const missingInMaster: string[] = [];
           
           for (let j = 0; j < lines.length; j++) {
-              const cols = lines[j].split('\t').map(c => c.trim());
-              if (j === 0 && cols[0].toLowerCase().includes('id')) continue; // Saltar cabecera
-              
-              if (cols.length >= 4) {
-                  items.push({
-                      id: `S${w.id}-${cols[0]}`, // Se agrega el prefijo de semana al ID
-                      description: cols[1],
-                      location: cols[2],
-                      systemStock: parseFloat(cols[3].replace(',', '.')) || 0,
-                      manufacturerCode: '',
-                      category: '',
-                      quantity: null
-                  });
+              const line = lines[j].trim();
+              if (!line) continue;
+
+              // Tomar la primera columna por si pegaron una tabla o columna con comas/tabs/punto y coma
+              const firstCol = line.split(/[\t;,]/)[0].trim().replace(/^["']|["']$/g, '');
+
+              // Saltar cabecera si existe
+              if (j === 0 && (firstCol.toLowerCase().includes('id') || firstCol.toLowerCase().includes('material'))) {
+                  continue;
               }
+
+              if (!firstCol) continue;
+
+              // Buscar artículo en Stock Maestro
+              const masterItem = masterStock
+                  ? (masterStock[firstCol] || Object.values(masterStock).find(m => m.id.toLowerCase() === firstCol.toLowerCase()))
+                  : undefined;
+
+              if (!masterItem) {
+                  missingInMaster.push(firstCol);
+              }
+
+              items.push({
+                  id: `S${w.id}-${firstCol}`, // Se agrega el prefijo de semana al ID
+                  materialId: firstCol,
+                  description: masterItem?.description || `Material ${firstCol}`,
+                  location: masterItem?.location || 'S/U',
+                  systemStock: typeof masterItem?.systemStock === 'number' ? masterItem.systemStock : 0,
+                  manufacturerCode: '',
+                  category: masterItem?.type || '',
+                  quantity: null
+              });
           }
 
           if (items.length === 0) {
-              alert(`No se encontraron ítems válidos en la ${w.name}. Verifique el formato.`);
+              alert(`No se encontraron ID_Material válidos en la ${w.name}. Verifique el formato.`);
               return;
+          }
+
+          if (missingInMaster.length > 0) {
+              const sample = missingInMaster.slice(0, 5).join(', ');
+              const confirmProceed = window.confirm(
+                  `En la ${w.name}, hay ${missingInMaster.length} ID_Material que no se encontraron en el Stock Maestro (ej: ${sample}).\n\n¿Desea continuar de todos modos? Los ítems sin coincidencia se registrarán con datos pendientes.`
+              );
+              if (!confirmProceed) return;
           }
 
           parsedWeeks.push({
@@ -149,12 +173,12 @@ export default function CrearConteo({ onBack }: { onBack: () => void }) {
                                       </div>
                                   </div>
                                   <div>
-                                      <label className="block text-sm font-medium text-slate-700 mb-1">Pegar Datos (Desde Excel)</label>
-                                      <p className="text-xs text-slate-500 mb-2">Orden requerido: ID_Material | Descripción | Ubicación | Stock_Sistema</p>
+                                      <label className="block text-sm font-medium text-slate-700 mb-1">Cargar ID_Material (Desde Excel)</label>
+                                      <p className="text-xs text-slate-500 mb-2">Pegue la columna con los ID_Material. La descripción, ubicación, tipo y stock se obtendrán automáticamente del Stock Maestro.</p>
                                       <textarea 
                                           required 
                                           className="w-full h-32 p-2 border rounded-md font-mono text-sm" 
-                                          placeholder="Pegue aquí las columnas copiadas de Excel..."
+                                          placeholder="Pegue aquí los ID_Material (uno por línea)..."
                                           value={week.rawData}
                                           onChange={e => handleWeekChange(week.id, 'rawData', e.target.value)}
                                       />
